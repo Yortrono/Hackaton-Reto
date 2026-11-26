@@ -18,43 +18,88 @@
 
   window.App = {
     init: function () {
-      this.initChart();
-      this.startDataSimulation();
       this.setupResize();
+      var isAuth = sessionStorage.getItem('vh_authenticated') === 'true';
+      var overlay = document.getElementById('authOverlay');
+
+      if (isAuth) {
+        if (overlay) overlay.style.display = 'none';
+        var savedUser = sessionStorage.getItem('vh_display_user') || 'ADMIN DE SEGURIDAD';
+        var savedRole = sessionStorage.getItem('vh_role') || 'security_admin';
+        state.user = savedUser;
+        state.role = savedRole;
+        this.updateUserDisplay();
+        this.initChart();
+        this.startDataSimulation();
+      } else {
+        if (overlay) overlay.style.display = 'flex';
+      }
     },
 
-    switchView: function (num) {
-      state.currentView = num;
-      // Actualizar botones de navegación
-      for (var i of ['1', '2', '3', '4', '5', '6']) {
-        var btn = document.getElementById('btnNav' + i);
-        var sec = document.getElementById('view' + i);
-        if (btn) btn.classList.remove('active');
-        if (sec) sec.classList.remove('active');
-      }
-
-      var activeBtn = document.getElementById('btnNav' + num);
-      var activeSec = document.getElementById('view' + num);
-      if (activeBtn) activeBtn.classList.add('active');
-      if (activeSec) activeSec.classList.add('active');
-
-      if (num === '4') {
-        this.resizeCanvas();
-      }
+    updateUserDisplay: function () {
+      var dUser = document.getElementById('displayUsername');
+      var dropName = document.getElementById('dropUserName');
+      var dropRole = document.getElementById('dropRoleTag');
+      if (dUser) dUser.textContent = state.user;
+      if (dropName) dropName.textContent = state.user;
+      if (dropRole) dropRole.textContent = 'Rol: ' + state.role;
     },
 
     toggleUserMenu: function () {
+      var dropdown = document.getElementById('userDropdown');
+      if (dropdown) {
+        dropdown.classList.toggle('open');
+      }
+    },
+
+    logout: function () {
+      sessionStorage.removeItem('vh_authenticated');
+      sessionStorage.removeItem('vh_display_user');
+      sessionStorage.removeItem('vh_role');
+      var dropdown = document.getElementById('userDropdown');
+      if (dropdown) dropdown.classList.remove('open');
       var overlay = document.getElementById('authOverlay');
-      overlay.style.display = (overlay.style.display === 'flex' ? 'none' : 'flex');
+      if (overlay) overlay.style.display = 'flex';
+      this.showToast('Sesión cerrada correctamente');
     },
 
     login: function () {
+      var self = this;
       var sel = document.getElementById('username');
-      var roleName = sel.value === 'admin' ? 'ADMIN DE SEGURIDAD' : (sel.value === 'operador' ? 'OPERADOR' : 'AUDITOR');
-      state.user = roleName;
-      document.getElementById('displayUsername').textContent = roleName;
-      document.getElementById('authOverlay').style.display = 'none';
-      this.showToast('Sesión activa como ' + roleName);
+      var username = sel ? sel.value : 'admin';
+      var totp = document.getElementById('totp') ? document.getElementById('totp').value.trim() : '';
+
+      if (totp !== '123456') {
+        self.showToast('Código MFA inválido. Ingrese 123456');
+        return;
+      }
+
+      var roleMap = {
+        admin: { title: 'ADMIN DE SEGURIDAD', role: 'security_admin' },
+        operador: { title: 'OPERADOR DE MITIGACIÓN', role: 'operator' },
+        auditor: { title: 'AUDITOR DE CUMPLIMIENTO', role: 'auditor' }
+      };
+
+      var roleData = roleMap[username] || roleMap.admin;
+      state.user = roleData.title;
+      state.role = roleData.role;
+
+      sessionStorage.setItem('vh_authenticated', 'true');
+      sessionStorage.setItem('vh_display_user', state.user);
+      sessionStorage.setItem('vh_role', state.role);
+
+      self.updateUserDisplay();
+
+      var overlay = document.getElementById('authOverlay');
+      if (overlay) overlay.style.display = 'none';
+
+      self.showToast('Autenticación MFA exitosa. Bienvenido');
+      self.initChart();
+      self.startDataSimulation();
+    },
+
+    onRoleChange: function (val) {
+      // Cambio opcional
     },
 
     rotarClave: function () {
