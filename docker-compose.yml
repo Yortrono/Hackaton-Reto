@@ -24,6 +24,8 @@ services:
       - "8080"
     networks:
       - soberana_interna
+    depends_on:
+      - ia-conductual
 
   # Microservicio Local de Inferencia Conductual ONNX (Dev 2)
   ia-conductual:
@@ -39,7 +41,22 @@ services:
     networks:
       - soberana_interna
 
-  # Placeholder para Backend Núcleo (Dev 1)
+  # Consola Administrativa y de Observabilidad Web (Dev 3)
+  consola-admin:
+    build:
+      context: ./consola-admin
+      dockerfile: Dockerfile
+    container_name: consola-admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3000}:3000"
+    expose:
+      - "3000"
+    networks:
+      - perimetral
+      - soberana_interna
+
+  # Backend Núcleo (Dev 1 / Placeholder soberano)
   backend-nucleo:
     container_name: backend-nucleo
     image: python:3.11-slim
@@ -47,17 +64,6 @@ services:
     restart: unless-stopped
     expose:
       - "8000"
-    networks:
-      - soberana_interna
-
-  # Placeholder para Consola Administrativa (Dev 3)
-  consola-admin:
-    container_name: consola-admin
-    image: python:3.11-slim
-    command: ["python", "-m", "http.server", "3000"]
-    restart: unless-stopped
-    expose:
-      - "3000"
     networks:
       - soberana_interna
 
