@@ -1,24 +1,18 @@
-# Servicio Autónomo de Verificación Humana y Mitigación de Bots
+# captcha
 
-**Hackathon Venezuela Innova 2026 — Plataforma Tecnológica Soberana**
+## Participantes
 
-Este repositorio contiene la arquitectura completa del servicio nacional de verificación de humanidad y defensa contra ataques automatizados (bots, scraping malicioso, credential stuffing y ataques DDoS L7), diseñado para operar **100 % *on-premise*** en infraestructura institucional nacional sin dependencias externas ni transferencia de datos al exterior.
+- Angela Rojas
+- José Peña
+- Yorbel Carrero
 
----
+## Descripción del proyecto
 
-## 1. Principios Arquitectónicos No Negociables
+## Alcance
 
-1. **Soberanía Tecnológica Total (Zero External Dependencies):**
-   - El sistema opera de manera autónoma o en redes desconectadas (*air-gapped*).
-   - Prohibido el uso de servicios extranjeros en tiempo de ejecución (Cloudflare, reCAPTCHA, Google Fonts, CDNs como cdnjs/unpkg).
-   - 100 % de bibliotecas y contenedores de código abierto (FOSS) auditables.
-2. **Privacidad por Diseño (Zero Raw Biometrics / Zero Raw IPs):**
-   - Análisis conductual efímero en memoria RAM.
-   - No se almacenan coordenadas de ratón crudas, pulsaciones de teclado ni texto del usuario.
-   - Anonimización inmediata de direcciones IP mediante $\text{SHA-256}(\text{IP} + \text{sal\_rotativa})$.
-3. **Inferencia Local de Alta Velocidad:**
-   - Modelos conductuales basados en LightGBM y ONNX Runtime ejecutados en servidor local con latencia estrictamente inferior a $50\text{ ms}$ (promedio $< 5\text{ ms}$).
+## Requerimientos del sistema
 
+<<<<<<< HEAD
 ---
 
 ## 2. Estructura del Repositorio y Roles de Ingeniería
@@ -106,4 +100,6 @@ npm start        # Inicia el servidor web en http://localhost:3000
 
 ## Requerimientos del sistema
 
+=======
+>>>>>>> 31e0dc3 (Inicializar README.md)
 ## Paso a paso de instalación / despliegue
