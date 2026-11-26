@@ -1,0 +1,1210 @@
+openapi: 3.1.0
+info:
+  title: Servicio Autónomo de Verificación Humana y Mitigación de Bots — Núcleo Backend
+  description: Núcleo soberano de verificación humana, bóveda criptográfica Ed25519/AES-256-GCM
+    y auditoría inmutable (Hackathon Venezuela Innova 2026)
+  version: 1.0.0
+paths:
+  /api/v1/challenge/init:
+    post:
+      tags:
+      - Verificación de Retos
+      summary: Inicializar Sesión de Verificación
+      description: Inicia el flujo de verificación para un cliente SDK, retornando
+        el reto PoW y los parámetros de política.
+      operationId: init_challenge_api_v1_challenge_init_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChallengeInitRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeInitResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/challenge/verify:
+    post:
+      tags:
+      - Verificación de Retos
+      summary: Verificar Señales Conductuales y Emitir Token
+      description: Recibe la solución PoW y telemetría conductual. Si es humano emite
+        token EdDSA (200), si requiere reto devuelve spatial_alignment (200), o bloquea
+        bots (403).
+      operationId: verify_challenge_api_v1_challenge_verify_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChallengeVerifyRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeVerifyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/token/validate:
+    post:
+      tags:
+      - Validación Criptográfica de Tokens
+      summary: Validar Token de Verificación Asimétrico
+      description: Valida la firma Ed25519 del token, vigencia y consume el identificador
+        único (jti) para mitigar ataques de repetición.
+      operationId: validate_token_api_v1_token_validate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenValidateRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenValidateResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/policies/{site_id}:
+    get:
+      tags:
+      - Sincronización de Políticas y Claves
+      summary: Sincronización Dinámica de Políticas hacia Borde
+      description: Expone las políticas de protección y las claves públicas Ed25519
+        activas para el Reverse Proxy OpenResty.
+      operationId: get_site_policies_api_v1_policies__site_id__get
+      parameters:
+      - name: site_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Site Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitePoliciesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/auth/login:
+    post:
+      tags:
+      - Administración - Autenticación y MFA
+      summary: Autenticación de Administradores con RBAC y MFA
+      description: Valida credenciales con Argon2id. Si el usuario tiene TOTP configurado,
+        exige el segundo factor.
+      operationId: admin_login_api_v1_admin_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminLoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminLoginResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/auth/setup-totp:
+    post:
+      tags:
+      - Administración - Autenticación y MFA
+      summary: Configurar Segundo Factor TOTP
+      description: Genera la semilla TOTP para configurar MFA en el usuario actual.
+      operationId: setup_totp_api_v1_admin_auth_setup_totp_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TOTPSetupResponse'
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/auth/verify-totp:
+    post:
+      tags:
+      - Administración - Autenticación y MFA
+      summary: Confirmar y Habilitar MFA/TOTP
+      description: Verifica el código inicial y activa permanentemente el MFA en la
+        cuenta.
+      operationId: verify_totp_endpoint_api_v1_admin_auth_verify_totp_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TOTPVerifyRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/vault/keys:
+    get:
+      tags:
+      - Administración - Bóveda Criptográfica
+      summary: Listar Claves Criptográficas de la Bóveda
+      description: Exclusivo para el rol 'security_admin'. Retorna las claves públicas
+        registradas en la bóveda.
+      operationId: list_keys_api_v1_admin_vault_keys_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CryptoPublicKeyInfo'
+                type: array
+                title: Response List Keys Api V1 Admin Vault Keys Get
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/vault/rotate:
+    post:
+      tags:
+      - Administración - Bóveda Criptográfica
+      summary: Rotación Soberana de Claves Asimétricas Ed25519
+      description: Exclusivo para 'security_admin'. Genera un nuevo par Ed25519, cifra
+        la privada con AES-256-GCM y activa la nueva clave.
+      operationId: rotate_key_api_v1_admin_vault_rotate_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotateKeyResponse'
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/sites:
+    get:
+      tags:
+      - Administración - Sitios y Políticas
+      summary: Listar Sitios Institucionales Protegidos
+      operationId: list_sites_api_v1_admin_sites_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SiteResponse'
+                type: array
+                title: Response List Sites Api V1 Admin Sites Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - Administración - Sitios y Políticas
+      summary: Registrar Nuevo Sitio Institucional Protegido
+      operationId: create_site_api_v1_admin_sites_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteCreateRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/policies/{site_id}:
+    put:
+      tags:
+      - Administración - Sitios y Políticas
+      summary: Actualizar Políticas de Mitigación de un Sitio
+      operationId: update_policy_api_v1_admin_policies__site_id__put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: site_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Site Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SitePolicy'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitePoliciesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/audit-logs:
+    get:
+      tags:
+      - Administración - Bitácora Inmutable
+      summary: Consultar Bitácora de Auditoría Criptográficamente Inmutable
+      description: Permite auditar el encadenamiento criptográfico (SHA-256 hash chaining)
+        de todas las operaciones administrativas.
+      operationId: get_audit_logs_api_v1_admin_audit_logs_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/observability/summary:
+    get:
+      tags:
+      - Administración - Observabilidad
+      summary: Resumen de Observabilidad en Tiempo Real
+      description: Agrega contadores locales de eventos de seguridad con métricas
+        de inferencia del módulo IA conductual (Dev 2).
+      operationId: get_observability_summary_api_v1_admin_observability_summary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilitySummaryResponse'
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/ai/model/upload:
+    post:
+      tags:
+      - Administración - Modelos IA
+      summary: Cargar y Recargar Modelo Conductual ONNX
+      description: Exclusivo para 'security_admin'. Valida el archivo ONNX, calcula
+        checksum SHA-256 y lo reenvía a ia-conductual.
+      operationId: upload_model_api_v1_admin_ai_model_upload_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_model_api_v1_admin_ai_model_upload_post'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelUploadResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /health:
+    get:
+      tags:
+      - Salud
+      summary: Health Check
+      operationId: health_check_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+components:
+  schemas:
+    AIPerformanceStats:
+      properties:
+        active_model_version:
+          type: string
+          title: Active Model Version
+          default: lgbm-conductual-v1.0.0
+        avg_inference_ms:
+          type: number
+          title: Avg Inference Ms
+          default: 3.8
+        p99_inference_ms:
+          type: number
+          title: P99 Inference Ms
+          default: 11.2
+        model_accuracy:
+          type: number
+          title: Model Accuracy
+          default: 0.984
+      type: object
+      title: AIPerformanceStats
+    AIThresholds:
+      properties:
+        challenge_min:
+          type: number
+          title: Challenge Min
+          default: 0.35
+        block_min:
+          type: number
+          title: Block Min
+          default: 0.75
+      type: object
+      title: AIThresholds
+    AdminLoginRequest:
+      properties:
+        username:
+          type: string
+          maxLength: 50
+          minLength: 3
+          title: Username
+        password:
+          type: string
+          minLength: 8
+          title: Password
+        totp_code:
+          anyOf:
+          - type: string
+            maxLength: 6
+            minLength: 6
+          - type: 'null'
+          title: Totp Code
+          description: Código TOTP si el usuario tiene MFA habilitado
+      type: object
+      required:
+      - username
+      - password
+      title: AdminLoginRequest
+    AdminLoginResponse:
+      properties:
+        access_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        mfa_required:
+          type: boolean
+          title: Mfa Required
+          default: false
+        temp_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Temp Token
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+      type: object
+      title: AdminLoginResponse
+    AuditLogItem:
+      properties:
+        id:
+          type: integer
+          title: Id
+        timestamp:
+          type: string
+          title: Timestamp
+        actor_username:
+          type: string
+          title: Actor Username
+        actor_role:
+          type: string
+          title: Actor Role
+        action:
+          type: string
+          title: Action
+        resource:
+          type: string
+          title: Resource
+        prev_hash:
+          type: string
+          title: Prev Hash
+        entry_hash:
+          type: string
+          title: Entry Hash
+      type: object
+      required:
+      - id
+      - timestamp
+      - actor_username
+      - actor_role
+      - action
+      - resource
+      - prev_hash
+      - entry_hash
+      title: AuditLogItem
+    AuditLogsResponse:
+      properties:
+        chain_integrity_valid:
+          type: boolean
+          title: Chain Integrity Valid
+        items:
+          items:
+            $ref: '#/components/schemas/AuditLogItem'
+          type: array
+          title: Items
+      type: object
+      required:
+      - chain_integrity_valid
+      - items
+      title: AuditLogsResponse
+    Body_upload_model_api_v1_admin_ai_model_upload_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_upload_model_api_v1_admin_ai_model_upload_post
+    ChallengeInitRequest:
+      properties:
+        site_key:
+          type: string
+          maxLength: 64
+          minLength: 8
+          title: Site Key
+          description: Clave pública del sitio institucional
+        target_route:
+          type: string
+          title: Target Route
+          description: Ruta protegida solicitada por el cliente
+        client_context:
+          anyOf:
+          - $ref: '#/components/schemas/ClientContext'
+          - type: 'null'
+      type: object
+      required:
+      - site_key
+      - target_route
+      title: ChallengeInitRequest
+    ChallengeInitResponse:
+      properties:
+        challenge_id:
+          type: string
+          title: Challenge Id
+        policy_mode:
+          type: string
+          title: Policy Mode
+        pow_difficulty:
+          type: integer
+          title: Pow Difficulty
+        nonce:
+          type: string
+          title: Nonce
+        expires_in_seconds:
+          type: integer
+          title: Expires In Seconds
+        interactive_challenge:
+          anyOf:
+          - $ref: '#/components/schemas/InteractiveChallengeInfo'
+          - type: 'null'
+      type: object
+      required:
+      - challenge_id
+      - policy_mode
+      - pow_difficulty
+      - nonce
+      - expires_in_seconds
+      title: ChallengeInitResponse
+    ChallengeVerifyRequest:
+      properties:
+        site_key:
+          type: string
+          title: Site Key
+        challenge_id:
+          type: string
+          title: Challenge Id
+        pow_solution:
+          type: string
+          title: Pow Solution
+        telemetry:
+          $ref: '#/components/schemas/TelemetryPayload'
+        interactive_response:
+          anyOf:
+          - $ref: '#/components/schemas/InteractiveResponse'
+          - type: 'null'
+      type: object
+      required:
+      - site_key
+      - challenge_id
+      - pow_solution
+      - telemetry
+      title: ChallengeVerifyRequest
+    ChallengeVerifyResponse:
+      properties:
+        challenge_id:
+          type: string
+          title: Challenge Id
+        status:
+          type: string
+          title: Status
+        risk_score:
+          type: number
+          title: Risk Score
+        jwt_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Jwt Token
+        expires_in_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Expires In Seconds
+        interactive_challenge:
+          anyOf:
+          - $ref: '#/components/schemas/InteractiveChallengeInfo'
+          - type: 'null'
+      type: object
+      required:
+      - challenge_id
+      - status
+      - risk_score
+      title: ChallengeVerifyResponse
+    ClientContext:
+      properties:
+        sdk_version:
+          type: string
+          title: Sdk Version
+          default: 1.0.0
+        user_agent_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Agent Hash
+        timezone_offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Timezone Offset
+        screen_resolution:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Screen Resolution
+        language:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Language
+          default: es-VE
+      type: object
+      title: ClientContext
+    CryptoPublicKeyInfo:
+      properties:
+        kid:
+          type: string
+          title: Kid
+        algorithm:
+          type: string
+          title: Algorithm
+          default: EdDSA
+        curve:
+          type: string
+          title: Curve
+          default: Ed25519
+        public_key_pem:
+          type: string
+          title: Public Key Pem
+        active:
+          type: boolean
+          title: Active
+          default: true
+      type: object
+      required:
+      - kid
+      - public_key_pem
+      title: CryptoPublicKeyInfo
+    EnvironmentSignals:
+      properties:
+        webdriver_flag:
+          type: boolean
+          title: Webdriver Flag
+          default: false
+        plugins_count:
+          type: integer
+          title: Plugins Count
+          default: 0
+        languages_consistent:
+          type: boolean
+          title: Languages Consistent
+          default: true
+        viewport_ratio_valid:
+          type: boolean
+          title: Viewport Ratio Valid
+          default: true
+        time_to_first_interaction_ms:
+          type: number
+          title: Time To First Interaction Ms
+          default: 0.0
+      type: object
+      title: EnvironmentSignals
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    InteractiveChallengeInfo:
+      properties:
+        required_immediately:
+          type: boolean
+          title: Required Immediately
+          default: false
+        type:
+          type: string
+          title: Type
+          default: spatial_alignment
+        target_angle:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Target Angle
+        tolerance:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Tolerance
+        prompt:
+          type: string
+          title: Prompt
+          default: Deslice el control hasta alinear el indicador
+        accessible_hint:
+          type: string
+          title: Accessible Hint
+          default: Use las flechas izquierda o derecha del teclado para centrar la
+            marca
+      type: object
+      title: InteractiveChallengeInfo
+    InteractiveResponse:
+      properties:
+        completed:
+          type: boolean
+          title: Completed
+          default: true
+        interaction_duration_ms:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Interaction Duration Ms
+        precision_delta:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Precision Delta
+      type: object
+      title: InteractiveResponse
+    KeyboardMetrics:
+      properties:
+        key_count:
+          type: integer
+          title: Key Count
+          default: 0
+        mean_dwell_ms:
+          type: number
+          title: Mean Dwell Ms
+          default: 0.0
+        std_flight_ms:
+          type: number
+          title: Std Flight Ms
+          default: 0.0
+      type: object
+      title: KeyboardMetrics
+    ModelUploadResponse:
+      properties:
+        model_version:
+          type: string
+          title: Model Version
+        checksum_sha256:
+          type: string
+          title: Checksum Sha256
+        message:
+          type: string
+          title: Message
+        reloaded_in_ia:
+          type: boolean
+          title: Reloaded In Ia
+      type: object
+      required:
+      - model_version
+      - checksum_sha256
+      - message
+      - reloaded_in_ia
+      title: ModelUploadResponse
+    ObservabilitySummaryResponse:
+      properties:
+        window:
+          type: string
+          title: Window
+          default: last_60_minutes
+        traffic_stats:
+          $ref: '#/components/schemas/TrafficStats'
+        ai_performance:
+          $ref: '#/components/schemas/AIPerformanceStats'
+        recent_security_events:
+          items:
+            $ref: '#/components/schemas/SecurityEventItem'
+          type: array
+          title: Recent Security Events
+      type: object
+      required:
+      - traffic_stats
+      - ai_performance
+      - recent_security_events
+      title: ObservabilitySummaryResponse
+    PointerMetrics:
+      properties:
+        event_count:
+          type: integer
+          title: Event Count
+          default: 0
+        mean_velocity:
+          type: number
+          title: Mean Velocity
+          default: 0.0
+        std_acceleration:
+          type: number
+          title: Std Acceleration
+          default: 0.0
+        angular_entropy:
+          type: number
+          title: Angular Entropy
+          default: 0.0
+        straight_line_ratio:
+          type: number
+          title: Straight Line Ratio
+          default: 0.0
+      type: object
+      title: PointerMetrics
+    ProtectedRoute:
+      properties:
+        path_prefix:
+          type: string
+          title: Path Prefix
+        methods:
+          items:
+            type: string
+          type: array
+          title: Methods
+          default:
+          - GET
+          - POST
+        require_token:
+          type: boolean
+          title: Require Token
+          default: true
+        rate_limit_rpm:
+          type: integer
+          title: Rate Limit Rpm
+          default: 60
+      type: object
+      required:
+      - path_prefix
+      title: ProtectedRoute
+    RotateKeyResponse:
+      properties:
+        kid:
+          type: string
+          title: Kid
+        algorithm:
+          type: string
+          title: Algorithm
+          default: EdDSA
+        curve:
+          type: string
+          title: Curve
+          default: Ed25519
+        created_at:
+          type: string
+          title: Created At
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - kid
+      - created_at
+      - message
+      title: RotateKeyResponse
+    SecurityEventItem:
+      properties:
+        event_id:
+          type: string
+          title: Event Id
+        timestamp:
+          type: string
+          title: Timestamp
+        ip_hash:
+          type: string
+          title: Ip Hash
+        route:
+          type: string
+          title: Route
+        action:
+          type: string
+          title: Action
+        reason:
+          type: string
+          title: Reason
+        risk_score:
+          type: number
+          title: Risk Score
+      type: object
+      required:
+      - event_id
+      - timestamp
+      - ip_hash
+      - route
+      - action
+      - reason
+      - risk_score
+      title: SecurityEventItem
+    SiteCreateRequest:
+      properties:
+        site_id:
+          type: string
+          maxLength: 50
+          minLength: 3
+          title: Site Id
+        name:
+          type: string
+          maxLength: 100
+          minLength: 3
+          title: Name
+        domain:
+          type: string
+          maxLength: 255
+          minLength: 3
+          title: Domain
+      type: object
+      required:
+      - site_id
+      - name
+      - domain
+      title: SiteCreateRequest
+    SitePoliciesResponse:
+      properties:
+        site_id:
+          type: string
+          title: Site Id
+        site_key:
+          type: string
+          title: Site Key
+        updated_at:
+          type: string
+          title: Updated At
+        policy:
+          $ref: '#/components/schemas/SitePolicy'
+        crypto_public_keys:
+          items:
+            $ref: '#/components/schemas/CryptoPublicKeyInfo'
+          type: array
+          title: Crypto Public Keys
+      type: object
+      required:
+      - site_id
+      - site_key
+      - updated_at
+      - policy
+      - crypto_public_keys
+      title: SitePoliciesResponse
+    SitePolicy:
+      properties:
+        mode:
+          type: string
+          title: Mode
+          default: challenge
+        ai_thresholds:
+          $ref: '#/components/schemas/AIThresholds'
+        protected_routes:
+          items:
+            $ref: '#/components/schemas/ProtectedRoute'
+          type: array
+          title: Protected Routes
+        rate_limit_global_rpm:
+          type: integer
+          title: Rate Limit Global Rpm
+          default: 120
+        ip_whitelist:
+          items:
+            type: string
+          type: array
+          title: Ip Whitelist
+        ip_blacklist:
+          items:
+            type: string
+          type: array
+          title: Ip Blacklist
+      type: object
+      title: SitePolicy
+    SiteResponse:
+      properties:
+        site_id:
+          type: string
+          title: Site Id
+        site_key:
+          type: string
+          title: Site Key
+        name:
+          type: string
+          title: Name
+        domain:
+          type: string
+          title: Domain
+        created_at:
+          type: string
+          title: Created At
+        active:
+          type: boolean
+          title: Active
+      type: object
+      required:
+      - site_id
+      - site_key
+      - name
+      - domain
+      - created_at
+      - active
+      title: SiteResponse
+    TOTPSetupResponse:
+      properties:
+        secret:
+          type: string
+          title: Secret
+        provisioning_uri:
+          type: string
+          title: Provisioning Uri
+        qr_svg:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Qr Svg
+      type: object
+      required:
+      - secret
+      - provisioning_uri
+      title: TOTPSetupResponse
+    TOTPVerifyRequest:
+      properties:
+        totp_code:
+          type: string
+          maxLength: 6
+          minLength: 6
+          title: Totp Code
+      type: object
+      required:
+      - totp_code
+      title: TOTPVerifyRequest
+    TelemetryPayload:
+      properties:
+        challenge_id:
+          type: string
+          title: Challenge Id
+        telemetry_window_ms:
+          type: number
+          title: Telemetry Window Ms
+          default: 0.0
+        pointer_metrics:
+          anyOf:
+          - $ref: '#/components/schemas/PointerMetrics'
+          - type: 'null'
+        keyboard_metrics:
+          anyOf:
+          - $ref: '#/components/schemas/KeyboardMetrics'
+          - type: 'null'
+        environment_signals:
+          anyOf:
+          - $ref: '#/components/schemas/EnvironmentSignals'
+          - type: 'null'
+      type: object
+      required:
+      - challenge_id
+      title: TelemetryPayload
+    TokenValidateRequest:
+      properties:
+        jwt_token:
+          type: string
+          title: Jwt Token
+        site_key:
+          type: string
+          title: Site Key
+        consume_jti:
+          type: boolean
+          title: Consume Jti
+          default: true
+      type: object
+      required:
+      - jwt_token
+      - site_key
+      title: TokenValidateRequest
+    TokenValidateResponse:
+      properties:
+        valid:
+          type: boolean
+          title: Valid
+        jti:
+          type: string
+          title: Jti
+        risk_score:
+          type: number
+          title: Risk Score
+        consumed_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Consumed At
+      type: object
+      required:
+      - valid
+      - jti
+      - risk_score
+      title: TokenValidateResponse
+    TrafficStats:
+      properties:
+        total_requests:
+          type: integer
+          title: Total Requests
+          default: 0
+        verified_humans:
+          type: integer
+          title: Verified Humans
+          default: 0
+        interactive_challenges_solved:
+          type: integer
+          title: Interactive Challenges Solved
+          default: 0
+        bots_blocked:
+          type: integer
+          title: Bots Blocked
+          default: 0
+        ddos_rate_limited:
+          type: integer
+          title: Ddos Rate Limited
+          default: 0
+        human_percentage:
+          type: number
+          title: Human Percentage
+          default: 0.0
+      type: object
+      title: TrafficStats
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
