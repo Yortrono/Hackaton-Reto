@@ -1,0 +1,208 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:550e8400-e29b-41d4-a716-446655440003",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-26T18:30:00Z",
+    "tools": [
+      {
+        "vendor": "Venezuela Innova 2026",
+        "name": "Auditoría de Soberanía Tecnológica SBOM",
+        "version": "1.0.0"
+      }
+    ],
+    "authors": [
+      {
+        "name": "Equipo de Ingeniería de Soberanía Tecnológica (Dev 1, Dev 2, Dev 3)",
+        "email": "seguridad@verificacion-humana.gob.ve"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:generic/servicio-autonomo-verificacion-humana@1.0.0",
+      "name": "Servicio Autónomo de Verificación Humana y Mitigación de Bots",
+      "version": "1.0.0",
+      "description": "Plataforma soberana de mitigación de ataques automatizados y verificación humana on-premise",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        { "name": "soberania:air_gapped_compatible", "value": "true" },
+        { "name": "soberania:zero_remote_dependencies", "value": "true" },
+        { "name": "soberania:cve_criticos_detectados", "value": "0" }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "framework",
+      "bom-ref": "pkg:pypi/fastapi@0.110.0",
+      "name": "fastapi",
+      "version": "0.110.0",
+      "scope": "required",
+      "description": "Framework web reactivo para la API REST del Núcleo Backend",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:pypi/fastapi@0.110.0",
+      "properties": [{ "name": "subsistema", "value": "backend-nucleo" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/uvicorn@0.29.0",
+      "name": "uvicorn",
+      "version": "0.29.0",
+      "scope": "required",
+      "description": "Servidor ASGI de alto rendimiento para Python",
+      "licenses": [{ "license": { "id": "BSD-3-Clause" } }],
+      "purl": "pkg:pypi/uvicorn@0.29.0",
+      "properties": [{ "name": "subsistema", "value": "backend-nucleo" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pydantic@2.6.4",
+      "name": "pydantic",
+      "version": "2.6.4",
+      "scope": "required",
+      "description": "Validación de contratos y esquemas JSON compartidos",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:pypi/pydantic@2.6.4",
+      "properties": [{ "name": "subsistema", "value": "backend-nucleo" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/cryptography@42.0.5",
+      "name": "cryptography",
+      "version": "42.0.5",
+      "scope": "required",
+      "description": "Firmas asimétricas Ed25519 y cifrado en reposo AES-256-GCM para la bóveda",
+      "licenses": [{ "license": { "id": "Apache-2.0" } }],
+      "purl": "pkg:pypi/cryptography@42.0.5",
+      "properties": [{ "name": "subsistema", "value": "backend-nucleo" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyjwt@2.8.0",
+      "name": "pyjwt",
+      "version": "2.8.0",
+      "scope": "required",
+      "description": "Emisión y verificación de tokens JWT asimétricos con claims jti de un solo uso",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:pypi/pyjwt@2.8.0",
+      "properties": [{ "name": "subsistema", "value": "backend-nucleo" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyotp@2.9.0",
+      "name": "pyotp",
+      "version": "2.9.0",
+      "scope": "required",
+      "description": "Autenticación de dos factores (2FA / TOTP) para acceso administrativo",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:pypi/pyotp@2.9.0",
+      "properties": [{ "name": "subsistema", "value": "backend-nucleo" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/argon2-cffi@23.1.0",
+      "name": "argon2-cffi",
+      "version": "23.1.0",
+      "scope": "required",
+      "description": "Función de derivación y hash de contraseñas resistente a GPU",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:pypi/argon2-cffi@23.1.0",
+      "properties": [{ "name": "subsistema", "value": "backend-nucleo" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/onnxruntime@1.17.1",
+      "name": "onnxruntime",
+      "version": "1.17.1",
+      "scope": "required",
+      "description": "Motor de inferencia local de alta velocidad para modelos conductuales",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:pypi/onnxruntime@1.17.1",
+      "properties": [{ "name": "subsistema", "value": "ia-conductual" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/lightgbm@4.3.0",
+      "name": "lightgbm",
+      "version": "4.3.0",
+      "scope": "required",
+      "description": "Algoritmo de clasificación basado en árboles de gradiente optimizado",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:pypi/lightgbm@4.3.0",
+      "properties": [{ "name": "subsistema", "value": "ia-conductual" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/scikit-learn@1.4.1.post1",
+      "name": "scikit-learn",
+      "version": "1.4.1.post1",
+      "scope": "required",
+      "description": "Preprocesamiento y cálculo de métricas de telemetría sintética",
+      "licenses": [{ "license": { "id": "BSD-3-Clause" } }],
+      "purl": "pkg:pypi/scikit-learn@1.4.1.post1",
+      "properties": [{ "name": "subsistema", "value": "ia-conductual" }]
+    },
+    {
+      "type": "container",
+      "bom-ref": "pkg:docker/openresty/openresty@alpine",
+      "name": "openresty",
+      "version": "1.25.3.1-alpine",
+      "scope": "required",
+      "description": "Capa de borde Nginx + LuaJIT para inspección, rate limit y validación de tokens",
+      "licenses": [{ "license": { "id": "BSD-2-Clause" } }],
+      "purl": "pkg:docker/openresty/openresty@1.25.3.1-alpine",
+      "properties": [{ "name": "subsistema", "value": "borde-proxy" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:luarocks/lua-resty-jwt@0.2.3",
+      "name": "lua-resty-jwt",
+      "version": "0.2.3",
+      "scope": "required",
+      "description": "Verificación criptográfica de tokens JWT en memoria Lua compartida",
+      "licenses": [{ "license": { "id": "Apache-2.0" } }],
+      "purl": "pkg:luarocks/lua-resty-jwt@0.2.3",
+      "properties": [{ "name": "subsistema", "value": "borde-proxy" }]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/sdk-verificacion-humana@1.0.0",
+      "name": "sdk-verificacion-humana",
+      "version": "1.0.0",
+      "scope": "required",
+      "description": "Widget web minimalista autocontenido en Vanilla JS con cero dependencias externas",
+      "licenses": [{ "license": { "id": "Apache-2.0" } }],
+      "purl": "pkg:generic/sdk-verificacion-humana@1.0.0",
+      "properties": [
+        { "name": "subsistema", "value": "sdk-cliente" },
+        { "name": "runtime_dependencies_count", "value": "0" },
+        { "name": "external_cdn_calls", "value": "0" }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:generic/consola-admin-soberana@1.0.0",
+      "name": "consola-admin-soberana",
+      "version": "1.0.0",
+      "scope": "required",
+      "description": "Panel de administración y observabilidad en tiempo real con Canvas y SVGs nativos",
+      "licenses": [{ "license": { "id": "Apache-2.0" } }],
+      "purl": "pkg:generic/consola-admin-soberana@1.0.0",
+      "properties": [
+        { "name": "subsistema", "value": "consola-admin" },
+        { "name": "external_font_calls", "value": "0" },
+        { "name": "external_analytics_calls", "value": "0" }
+      ]
+    }
+  ],
+  "vulnerabilities": []
+}
