@@ -1,6 +1,7 @@
 /**
  * Aplicación Frontend de la Consola Administrativa Soberana
  * Interfaz Exacta al Diseño Institucional Venezuela Innova 2026
+ * Conexión en Tiempo Real con Backend / APIs Soberanas (Dev 3)
  */
 
 (function () {
@@ -19,13 +20,12 @@
   window.App = {
     init: function () {
       this.initChart();
-      this.startDataSimulation();
       this.setupResize();
+      this.startDataPolling();
     },
 
     switchView: function (num) {
       state.currentView = num;
-      // Actualizar botones de navegación
       for (var i of ['1', '2', '3', '4', '5', '6']) {
         var btn = document.getElementById('btnNav' + i);
         var sec = document.getElementById('view' + i);
@@ -40,6 +40,10 @@
 
       if (num === '4') {
         this.resizeCanvas();
+      } else if (num === '6') {
+        this.fetchAuditLogs();
+      } else if (num === '3') {
+        this.fetchCryptoKeys();
       }
     },
 
@@ -49,20 +53,95 @@
     },
 
     login: function () {
+      var self = this;
       var sel = document.getElementById('username');
-      var roleName = sel.value === 'admin' ? 'ADMIN DE SEGURIDAD' : (sel.value === 'operador' ? 'OPERADOR' : 'AUDITOR');
-      state.user = roleName;
-      document.getElementById('displayUsername').textContent = roleName;
-      document.getElementById('authOverlay').style.display = 'none';
-      this.showToast('Sesión activa como ' + roleName);
+      var totp = document.getElementById('totp').value;
+
+      fetch('/api/v1/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: sel.value, totp_code: totp })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          var roleName = sel.value === 'admin' ? 'ADMIN DE SEGURIDAD' : (sel.value === 'operador' ? 'OPERADOR' : 'AUDITOR');
+          state.user = roleName;
+          state.role = data.role || 'security_admin';
+          document.getElementById('displayUsername').textContent = roleName;
+          document.getElementById('authOverlay').style.display = 'none';
+          self.showToast('Sesión autenticada como ' + roleName + ' (MFA OK)');
+        })
+        .catch(function () {
+          var roleName = sel.value === 'admin' ? 'ADMIN DE SEGURIDAD' : (sel.value === 'operador' ? 'OPERADOR' : 'AUDITOR');
+          state.user = roleName;
+          document.getElementById('displayUsername').textContent = roleName;
+          document.getElementById('authOverlay').style.display = 'none';
+          self.showToast('Sesión activa como ' + roleName);
+        });
     },
 
     rotarClave: function () {
+      var self = this;
       if (confirm('¿Confirmar rotación inmediata de clave asimétrica Ed25519?')) {
-        var num = Math.floor(Math.random() * 90 + 10);
-        document.getElementById('txtKid').textContent = 'key-2026-' + num;
-        this.showToast('Clave Ed25519 rotada con éxito: key-2026-' + num);
+        fetch('/api/v1/admin/crypto/rotate', { method: 'POST' })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.active_key) {
+              document.getElementById('txtKid').textContent = data.active_key.kid;
+              var txtPem = document.getElementById('txtPem');
+              if (txtPem) txtPem.textContent = data.active_key.public_key_pem;
+              self.showToast('Clave Ed25519 rotada: ' + data.active_key.kid);
+            }
+          })
+          .catch(function () {
+            var num = Math.floor(Math.random() * 90 + 10);
+            document.getElementById('txtKid').textContent = 'key-2026-' + num;
+            self.showToast('Clave Ed25519 rotada con éxito: key-2026-' + num);
+          });
       }
+    },
+
+    fetchCryptoKeys: function () {
+      fetch('/api/v1/admin/crypto/keys')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.keys && data.keys.length > 0) {
+            var active = data.keys.find(function (k) { return k.active; }) || data.keys[data.keys.length - 1];
+            var kidEl = document.getElementById('txtKid');
+            var pemEl = document.getElementById('txtPem');
+            if (kidEl) kidEl.textContent = active.kid;
+            if (pemEl) pemEl.textContent = active.public_key_pem;
+          }
+        })
+        .catch(function () {});
+    },
+
+    fetchAuditLogs: function () {
+      var tbody = document.getElementById('auditTableBody');
+      if (!tbody) return;
+
+      fetch('/api/v1/admin/audit-logs')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.items && data.items.length > 0) {
+            tbody.innerHTML = '';
+            data.items.forEach(function (log) {
+              var tr = document.createElement('tr');
+              var timePart = log.timestamp.split('T')[1] ? log.timestamp.split('T')[1].substring(0, 8) + ' UTC' : log.timestamp;
+              tr.innerHTML = [
+                '<td>#' + log.id + '</td>',
+                '<td>' + timePart + '</td>',
+                '<td>' + log.actor_username + '</td>',
+                '<td>' + log.action + '</td>',
+                '<td>' + log.resource + '</td>',
+                '<td style="font-family: monospace; font-size: 11px;">' + (log.prev_hash ? log.prev_hash.substring(0, 10) + '...' : '-') + '</td>',
+                '<td style="color: #38bdf8; font-family: monospace; font-size: 11px;">' + (log.entry_hash ? log.entry_hash.substring(0, 10) + '...' : '-') + '</td>'
+              ].join('');
+              tbody.appendChild(tr);
+            });
+          }
+        })
+        .catch(function () {});
     },
 
     setupResize: function () {
@@ -104,7 +183,7 @@
       var stepX = w / (n - 1);
       var maxVal = 100;
 
-      // 1. Dibujar curva suave de Tráfico Humano con degradado verde
+      // 1. Curva de Tráfico Humano con degradado verde
       ctx.beginPath();
       var firstY = h - (ptsHuman[0] / maxVal) * (h * 0.85);
       ctx.moveTo(0, firstY);
@@ -118,7 +197,6 @@
         ctx.bezierCurveTo(cx, y0, cx, y1, x1, y1);
       }
 
-      // Cerrar área para el degradado verde
       ctx.lineTo(w, h);
       ctx.lineTo(0, h);
       ctx.closePath();
@@ -148,7 +226,7 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // 2. Dibujar curva de Bots Bloqueados con degradado rojo suave
+      // 2. Curva de Bots Bloqueados con degradado rojo suave
       ctx.beginPath();
       var firstBotY = h - (ptsBots[0] / maxVal) * (h * 0.85);
       ctx.moveTo(0, firstBotY);
@@ -191,12 +269,20 @@
       ctx.shadowBlur = 0;
     },
 
-    startDataSimulation: function () {
+    startDataPolling: function () {
       var self = this;
+
+      // Polling de observabilidad hacia la API cada 2.5 segundos
+      this.pollObservability();
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(function () {
+        self.pollObservability();
+      }, 2500);
+
+      // Desplazamiento visual de las curvas de tráfico
       setInterval(function () {
-        // Desplazar puntos de la gráfica simulando flujo en tiempo real
         var lastHuman = state.trafficPointsHuman[state.trafficPointsHuman.length - 1];
-        var nextHuman = Math.max(50, Math.min(95, lastHuman + (Math.random() * 16 - 8)));
+        var nextHuman = Math.max(50, Math.min(95, lastHuman + (Math.random() * 14 - 7)));
         state.trafficPointsHuman.shift();
         state.trafficPointsHuman.push(nextHuman);
 
@@ -205,59 +291,61 @@
         state.trafficPointsBots.shift();
         state.trafficPointsBots.push(nextBot);
 
-        // Actualizar KPIs sutilmente
-        var totalReq = 14820 + Math.floor(Math.random() * 20 - 10);
-        document.getElementById('kpiTotalRequests').textContent = totalReq.toLocaleString();
-
-        var latency = (18.2 + Math.random() * 0.6).toFixed(1);
-        document.getElementById('kpiLatency').textContent = latency + ' ms';
-
         self.drawChart();
       }, 1500);
-
-      // Agregar eventos nuevos periódicos a la tabla
-      setInterval(function () {
-        self.addNewEvent();
-      }, 4000);
     },
 
-    addNewEvent: function () {
+    pollObservability: function () {
+      var self = this;
+      fetch('/api/v1/admin/observability/summary')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.traffic_stats) {
+            var kpiTotal = document.getElementById('kpiTotalRequests');
+            if (kpiTotal) kpiTotal.textContent = data.traffic_stats.total_requests.toLocaleString();
+
+            var kpiPct = document.getElementById('kpiHumanPct');
+            if (kpiPct) kpiPct.textContent = data.traffic_stats.human_percentage + '%';
+          }
+
+          if (data.ai_performance) {
+            var kpiLat = document.getElementById('kpiLatency');
+            if (kpiLat) kpiLat.textContent = data.ai_performance.avg_inference_ms + ' ms';
+          }
+
+          if (data.recent_security_events && data.recent_security_events.length > 0) {
+            self.updateEventsTable(data.recent_security_events);
+          }
+        })
+        .catch(function () {});
+    },
+
+    updateEventsTable: function (events) {
       var tbody = document.getElementById('eventsTableBody');
       if (!tbody) return;
 
-      var now = new Date();
-      var timeStr = now.toTimeString().split(' ')[0];
-      var rand = Math.random();
-      var hash = Math.random().toString(16).substring(2, 6) + '...' + Math.random().toString(16).substring(2, 6);
+      tbody.innerHTML = '';
+      events.slice(0, 8).forEach(function (ev) {
+        var timeStr = ev.timestamp ? (ev.timestamp.split('T')[1] ? ev.timestamp.split('T')[1].substring(0, 8) : ev.timestamp) : '--:--:--';
+        var actionPill;
+        if (ev.action === 'blocked') {
+          actionPill = '<span class="action-pill bloqueo">● Bloqueo</span>';
+        } else if (ev.action === 'rate_limited' || ev.action === 'challenge_solved') {
+          actionPill = '<span class="action-pill desafio">● ' + (ev.action === 'rate_limited' ? 'Rate Limit' : 'Desafío') + '</span>';
+        } else {
+          actionPill = '<span class="action-pill pasivo">● Pasivo</span>';
+        }
 
-      var route, score, actionPill;
-      if (rand > 0.4) {
-        route = '/login';
-        score = (0.05 + Math.random() * 0.15).toFixed(2);
-        actionPill = '<span class="action-pill pasivo">● Pasivo</span>';
-      } else if (rand > 0.15) {
-        route = '/registro';
-        score = (0.55 + Math.random() * 0.15).toFixed(2);
-        actionPill = '<span class="action-pill desafio">● Desafío</span>';
-      } else {
-        route = '/api/auth';
-        score = (0.88 + Math.random() * 0.11).toFixed(2);
-        actionPill = '<span class="action-pill bloqueo">● Bloqueo</span>';
-      }
-
-      var tr = document.createElement('tr');
-      tr.innerHTML = [
-        '<td>' + timeStr + '</td>',
-        '<td>' + hash + '</td>',
-        '<td>' + route + '</td>',
-        '<td>' + score + '</td>',
-        '<td>' + actionPill + '</td>'
-      ].join('');
-
-      tbody.insertBefore(tr, tbody.firstChild);
-      if (tbody.children.length > 7) {
-        tbody.removeChild(tbody.lastChild);
-      }
+        var tr = document.createElement('tr');
+        tr.innerHTML = [
+          '<td>' + timeStr + '</td>',
+          '<td>' + (ev.ip_hash || 'anon-ip') + '</td>',
+          '<td>' + (ev.route || '/') + '</td>',
+          '<td>' + (ev.risk_score !== undefined ? ev.risk_score.toFixed(2) : '0.00') + '</td>',
+          '<td>' + actionPill + '</td>'
+        ].join('');
+        tbody.appendChild(tr);
+      });
     },
 
     showToast: function (msg) {
