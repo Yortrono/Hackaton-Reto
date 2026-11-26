@@ -1,0 +1,18 @@
+{
+  "componente": "ia-conductual-y-borde",
+  "desarrollador": "Dev 2 (IA, Borde e Infraestructura)",
+  "fecha_auditoria": "2026-11-26T20:20:25Z",
+  "licencia_general": "FOSS / Soberana",
+  "seguridad_perimetral": {
+    "protocolo_tls": "TLSv1.3",
+    "cifrado_recomendado": "TLS_AES_256_GCM_SHA384",
+    "red_interna": "soberana_interna (internal: true)"
+  },
+  "motor_ia": {
+    "framework": "LightGBM + ONNX Runtime",
+    "version_modelo": "lgbm-conductual-v1.0.0",
+    "peso_modelo_bytes": 147036,
+    "latencia_promedio_ms": 0.55
+  },
+  "paquetes_python": [{"name": "annotated-types", "version": "0.8.0"}, {"name": "anyio", "version": "4.16.0"}, {"name": "click", "version": "8.5.1"}, {"name": "cloudpickle", "version": "3.1.3"}, {"name": "fastapi", "version": "0.115.8"}, {"name": "flatbuffers", "version": "25.12.19"}, {"name": "h11", "version": "0.16.0"}, {"name": "idna", "version": "3.20"}, {"name": "joblib", "version": "1.6.0"}, {"name": "lightgbm", "version": "4.7.0"}, {"name": "ml_dtypes", "version": "0.7.0"}, {"name": "narwhals", "version": "2.29.0"}, {"name": "numpy", "version": "2.4.6"}, {"name": "onnx", "version": "1.23.2"}, {"name": "onnxmltools", "version": "1.16.0"}, {"name": "onnxruntime", "version": "1.32.0"}, {"name": "packaging", "version": "26.4"}, {"name": "pip", "version": "24.0"}, {"name": "protobuf", "version": "7.36.2"}, {"name": "pydantic", "version": "2.10.6"}, {"name": "pydantic_core", "version": "2.27.2"}, {"name": "python-multipart", "version": "0.0.34"}, {"name": "scikit-learn", "version": "1.9.1"}, {"name": "scipy", "version": "1.17.1"}, {"name": "setuptools", "version": "79.0.1"}, {"name": "skl2onnx", "version": "1.20.0"}, {"name": "starlette", "version": "0.45.3"}, {"name": "threadpoolctl", "version": "3.8.0"}, {"name": "typing_extensions", "version": "4.16.0"}, {"name": "uvicorn", "version": "0.34.0"}, {"name": "wheel", "version": "0.46.3"}]
+}

@@ -1,0 +1,53 @@
+{
+  "model_version": "lgbm-conductual-v1.0.0",
+  "created_at": "2026-11-26T19:40:53.841862+00:00",
+  "framework": "LightGBM + ONNX Runtime",
+  "target_opset": 15,
+  "features": [
+    "pointer_event_count",
+    "pointer_mean_velocity",
+    "pointer_std_acceleration",
+    "pointer_angular_entropy",
+    "pointer_straight_line_ratio",
+    "keyboard_key_count",
+    "keyboard_mean_dwell_ms",
+    "keyboard_std_flight_ms",
+    "env_webdriver_flag",
+    "env_plugins_count",
+    "env_languages_consistent",
+    "env_viewport_ratio_valid",
+    "env_time_to_first_interaction_ms",
+    "telemetry_window_ms"
+  ],
+  "features_count": 14,
+  "input_tensor_name": "float_input",
+  "output_tensor_names": [
+    "label",
+    "probabilities"
+  ],
+  "metrics": {
+    "test_samples": 4000,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "roc_auc": 1.0,
+    "confusion_matrix": [
+      [
+        2000,
+        0
+      ],
+      [
+        0,
+        2000
+      ]
+    ]
+  },
+  "decision_thresholds": {
+    "human_max": 0.35,
+    "challenge_max": 0.75,
+    "bot_min": 0.75
+  },
+  "target_latency_p99_ms": 15.0,
+  "air_gapped_compatible": true,
+  "privacy_guarantee": "Ephemeral in-RAM processing. Zero biometric persistence."
+}
