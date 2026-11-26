@@ -4,6 +4,7 @@
   "description": "SDK / Widget Web minimalista autocontenido para el Servicio Autónomo de Verificación Humana y Mitigación de Bots (Venezuela Innova 2026)",
   "main": "sdk-verificacion.min.js",
   "scripts": {
+    "start": "node serve.js",
     "build": "node -e 'const fs=require(\"fs\"); const s=fs.readFileSync(\"sdk-verificacion.js\",\"utf8\"); fs.writeFileSync(\"sdk-verificacion.min.js\", \"/* v1.0.0 */ \" + s.replace(/\\/\\*[\\s\\S]*?\\*\\//g,\"\").replace(/(^|[^\\:])\\/\\/[^\\n]*/g,\"$1\").split(\"\\n\").map(l=>l.trim()).filter(l=>l.length>0).join(\" \"));'",
     "test": "node test.js"
   },
