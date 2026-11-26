@@ -1,0 +1,38 @@
+{
+  "site_id": "default",
+  "site_key": "vh_site_9f8e7d6c5b4a3210",
+  "updated_at": "2026-11-26T18:30:00Z",
+  "policy": {
+    "mode": "challenge",
+    "ai_thresholds": {
+      "challenge_min": 0.35,
+      "block_min": 0.75
+    },
+    "protected_routes": [
+      {
+        "path_prefix": "/login",
+        "methods": ["POST"],
+        "require_token": true,
+        "rate_limit_rpm": 10
+      },
+      {
+        "path_prefix": "/api/consulta",
+        "methods": ["GET", "POST"],
+        "require_token": true,
+        "rate_limit_rpm": 30
+      }
+    ],
+    "rate_limit_global_rpm": 120,
+    "ip_whitelist": ["10.0.0.0/8"],
+    "ip_blacklist": ["198.51.100.42"]
+  },
+  "crypto_public_keys": [
+    {
+      "kid": "key-2026-01",
+      "algorithm": "EdDSA",
+      "curve": "Ed25519",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANkPzQ4k8K+w0yO4p/p6L7S8g9yR1gQy4mGqW8Xz7QoE=\n-----END PUBLIC KEY-----",
+      "active": true
+    }
+  ]
+}

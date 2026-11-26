@@ -1,0 +1,144 @@
+# BEGIN lua-resty-http
+
+dist lua-resty-http-0.17.1
+  aliases resty.http
+  modules lua-resty-http-0.17.1
+
+module lua-resty-http-0.17.1
+  aliases resty.http
+  section 18 13725 lua-resty-http
+  section 176 358 status
+  section 358 844 features
+  section 844 1536 api
+  section 1335 1536 deprecated
+  section 1536 13725 usage
+  section 2218 3025 single-shot request
+  section 3025 13725 streamed request
+  section 13725 14817 response
+  section 13744 14538 res.body\_reader
+  section 14538 14647 res:read\_body
+  section 14647 14817 res:read\_trailers
+  section 14817 16509 utility
+  section 14835 15475 parse\_uri
+  section 15475 16509 get\_client\_body\_reader
+  section 16509 20595 deprecated
+  section 16621 17136 tcp only connect
+  section 17136 19230 connect\_proxy
+  section 19230 19601 ssl\_handshake
+  section 19601 20595 proxy\_request / proxy\_response
+  section 19944 20306 proxy\_request
+  section 20306 20595 proxy\_response
+  section 20595 20721 author
+  section 20721 22158 licence
+
+# END lua-resty-http
+# BEGIN lua-resty-string
+
+dist lua-resty-string-0.11
+  aliases resty.string
+  modules lua-resty-string-0.11
+
+module lua-resty-string-0.11
+  aliases resty.string
+  section 18 118 name
+  section 118 268 status
+  section 268 449 description
+  section 449 5573 synopsis
+  section 5573 5655 author
+  section 5655 7149 copyright and license
+  section 7149 7251 see also
+
+# END lua-resty-string
+# BEGIN lua-resty-hmac
+
+dist lua-resty-hmac-0.06
+  aliases resty.hmac
+  modules lua-resty-hmac-0.06
+
+module lua-resty-hmac-0.06
+  aliases resty.hmac
+  section 18 88 name
+  section 88 188 status
+  section 188 369 description
+  section 369 1731 synopsis
+  section 1731 3981 methods
+  section 2142 2657 new
+  section 2657 2945 update
+  section 2945 3610 final
+  section 3610 3981 reset
+  section 3981 4264 prerequisites
+  section 4264 4949 installation
+  section 4949 6382 copyright and license
+  section 6382 6484 see also
+
+# END lua-resty-hmac
+# BEGIN lua-resty-openssl
+
+dist lua-resty-openssl-1.8.0
+  aliases resty.openssl
+  modules lua-resty-openssl-1.8.0
+
+module lua-resty-openssl-1.8.0
+  aliases resty.openssl
+  section 18 554 lua-resty-openssl
+  section 554 706 description
+  section 706 735 status
+  section 735 1626 synopsis
+  section 1626 3080 copyright and license
+  section 3080 3878 see also
+
+# END lua-resty-openssl
+# BEGIN lua-resty-jwt
+
+dist lua-resty-jwt-0.3.2
+  aliases resty.jwt
+  modules lua-resty-jwt-0.3.2
+
+module lua-resty-jwt-0.3.2
+  aliases resty.jwt
+  section 494 924 name
+  section 924 1203 installation
+  section 1203 1298 status
+  section 1298 1621 description
+  section 1621 2850 synopsis
+  section 2850 6205 methods
+  section 3259 3643 sign
+  section 3513 3643 sample of table_of_jwt
+  section 3643 4214 verify
+  section 4214 4861 load & verify
+  section 4481 4861 sample of jwt_obj
+  section 4861 5490 set_alg_whitelist
+  section 5490 5683 set_trusted_certs_file
+  section 5683 6205 sign-jwe
+  section 6052 6205 sample of table_of_jwt
+  section 6205 95088 verification
+  section 8113 8629 sample claim_spec
+  section 8629 14666 jwt validators
+  section 9289 9449 validators.chain(...)
+  section 9449 9840 validators.required(chain_function)
+  section 9840 10105 validators.require_one_of(claim_keys)
+  section 10105 10735 validators.check(check_val, check_function, name, check_type) (opt)
+  section 10735 10919 validators.equals(check_val) (opt)
+  section 10919 11103 validators.matches(pattern) (opt)
+  section 11103 11748 validators.any_of(check_values, check_function, name, check_type, table_type) (opt)
+  section 11748 11898 validators.equals_any_of(check_values) (opt)
+  section 11898 12034 validators.matches_any_of(patterns) (opt)
+  section 12034 12372 validators.contains_any_of(check_values,name) (opt)
+  section 12372 12602 validators.greater_than(check_val) (opt)
+  section 12602 12842 validators.greater_than_or_equal(check_val) (opt)
+  section 12842 13069 validators.less_than(check_val) (opt)
+  section 13069 13306 validators.less_than_or_equal(check_val) (opt)
+  section 13306 13527 validators.is_not_before() (opt)
+  section 13527 13759 validators.is_not_expired() (opt)
+  section 13759 14017 validators.is_at() (opt)
+  section 14017 14194 validators.set_system_leeway(leeway)
+  section 14194 14360 validators.set_system_clock(clock)
+  section 14360 14666 sample claim_spec using validators
+  section 14666 95088 legacy/timeframe options
+  section 94810 95088 sample of validation_options usage
+  section 95088 95341 examples
+  section 95341 95937 installation
+  section 95937 95980 testing with docker
+  section 95980 96082 see also
+
+# END lua-resty-jwt
