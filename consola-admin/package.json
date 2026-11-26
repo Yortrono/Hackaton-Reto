@@ -1,0 +1,20 @@
+{
+  "name": "consola-admin-verificacion-humana",
+  "version": "1.0.0",
+  "description": "Consola Administrativa y de Observabilidad Web Soberana (Venezuela Innova 2026)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "consola-admin",
+    "observabilidad",
+    "rbac",
+    "boveda-criptografica",
+    "auditoria-inmutable",
+    "soberania-tecnologica"
+  ],
+  "author": "Equipo Venezuela Innova 2026 (Dev 3)",
+  "license": "Apache-2.0"
+}

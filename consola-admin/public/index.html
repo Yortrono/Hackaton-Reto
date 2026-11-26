@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consola de Gestión y Observabilidad Soberana — Verificación Humana 2026</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Modal de Autenticación y Verificación de Segundo Factor MFA/TOTP -->
+  <div class="auth-overlay" id="authOverlay">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h2 class="auth-title">Acceso a Consola Soberana</h2>
+        <p class="auth-desc">Servicio Autónomo de Verificación Humana y Mitigación de Bots</p>
+      </div>
+
+      <form class="auth-form" id="loginForm" onsubmit="event.preventDefault(); window.App.login();">
+        <div class="form-group">
+          <label for="username">Usuario Administrativo:</label>
+          <select id="username" class="form-control" onchange="window.App.onUserSelectChange(this.value)">
+            <option value="admin">admin (security_admin - Control Total)</option>
+            <option value="operador">operador (operator - Sitios y Reglas)</option>
+            <option value="auditor">auditor (auditor - Solo Lectura e Integridad)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Contraseña Local:</label>
+          <input type="password" id="password" class="form-control" value="••••••••" required>
+        </div>
+
+        <div class="form-group">
+          <label for="totp">Código de Segundo Factor MFA/TOTP:</label>
+          <input type="text" id="totp" class="form-control" placeholder="123456" maxlength="6" value="123456" required>
+          <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">Código de prueba por defecto: 123456</span>
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; justify-content: center; margin-top: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Autenticar con Segundo Factor
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sidebar de Navegación -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>Antigravity Defense</h1>
+        <span>GOBIERNO DIGITAL • FOSS</span>
+      </div>
+    </div>
+
+    <ul class="nav-links">
+      <li class="nav-item">
+        <a class="nav-link active" onclick="window.App.switchTab('modulo4')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+          Módulo 4: Observabilidad
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.App.switchTab('modulo1')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Módulo 1: Sitios y Apps
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.App.switchTab('modulo2')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Módulo 2: Reglas y Mitigación
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="navBoveda" onclick="window.App.switchTab('modulo3')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Módulo 3: Bóveda Cripto
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="navModelo" onclick="window.App.switchTab('modulo5')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A7 7 0 0 1 5.07 11H5a1 1 0 0 1 0-2h.07A7 7 0 0 1 11 3.07V3a1 1 0 0 1 2 0v.07A7 7 0 0 1 18.93 9H19a1 1 0 0 1 0 2h-.07A7 7 0 0 1 13 16.93z"/></svg>
+          Módulo 5: Modelo IA Local
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.App.switchTab('modulo6')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Módulo 6: Auditoría Inmutable
+        </a>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div class="user-badge">
+        <div class="user-avatar" id="avatarRole">SA</div>
+        <div class="user-meta">
+          <div class="user-name" id="userDisplay">admin_seguridad</div>
+          <span class="role-tag security_admin" id="tagRole">security_admin</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="window.App.logout()" title="Cerrar sesión" style="padding: 4px 8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Contenedor Principal -->
+  <main class="main-wrapper">
+    <header class="topbar">
+      <div class="page-title" id="pageTitle">Módulo 4: Observabilidad en Tiempo Real</div>
+      <div class="topbar-actions">
+        <span class="badge badge-success" id="backendHealth">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+          Nodo Local Conectado
+        </span>
+        <button class="btn btn-secondary btn-sm" onclick="window.App.refreshData()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Actualizar
+        </button>
+      </div>
+    </header>
+
+    <div class="content-body">
+
+      <!-- ======================================================== -->
+      <!-- MÓDULO 4: OBSERVABILIDAD EN TIEMPO REAL -->
+      <!-- ======================================================== -->
+      <section class="module-section active" id="secModulo4">
+        <div class="stats-grid">
+          <div class="stat-card success">
+            <span class="stat-label">Peticiones Legítimas (Humanos)</span>
+            <span class="stat-value" id="statHumans">11,210</span>
+            <span class="stat-desc" id="statHumansPct">82.25% del tráfico total</span>
+          </div>
+          <div class="stat-card warning">
+            <span class="stat-label">Desafíos Espaciales Resueltos</span>
+            <span class="stat-value" id="statChallenges">980</span>
+            <span class="stat-desc">Resolución por reto accesible</span>
+          </div>
+          <div class="stat-card danger">
+            <span class="stat-label">Bots Automatizados Bloqueados</span>
+            <span class="stat-value" id="statBots">2,410</span>
+            <span class="stat-desc">Mitigación activa en borde L7</span>
+          </div>
+          <div class="stat-card accent">
+            <span class="stat-label">Latencia Inferencia IA Local</span>
+            <span class="stat-value" id="statLatency">3.8 ms</span>
+            <span class="stat-desc">Meta &lt; 50 ms (P99: 11.2 ms)</span>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <!-- Gráfico de Dona: Distribución de Tráfico -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                Distribución de Tráfico (Últimos 60 min)
+              </h3>
+            </div>
+            <div style="height: 240px; display: flex; align-items: center; justify-content: center;">
+              <canvas id="canvasTraffic" width="300" height="240"></canvas>
+            </div>
+            <div style="display: flex; justify-content: space-around; margin-top: 12px; font-size: 12px;">
+              <span style="color: #10b981;">● Humanos Verificados</span>
+              <span style="color: #f59e0b;">● Retos Espaciales</span>
+              <span style="color: #ef4444;">● Bots Mitigados</span>
+            </div>
+          </div>
+
+          <!-- Gráfico de Latencia IA vs Límite 50ms -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Rendimiento de Inferencia IA (ONNX / LightGBM)
+              </h3>
+            </div>
+            <div style="height: 240px; display: flex; align-items: center; justify-content: center;">
+              <canvas id="canvasLatency" width="400" height="240"></canvas>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 12px; font-size: 12px; color: var(--text-muted);">
+              <span>Muestreo continuo (ms)</span>
+              <span style="color: #ef4444;">— Límite Soberano Estricto: 50 ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historial de Eventos de Seguridad Anonimizados -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Historial de Eventos de Seguridad Anonimizados (Zero Raw IPs)
+            </h3>
+            <span class="badge badge-info">SHA-256 + Sal Rotativa</span>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID Evento</th>
+                  <th>Marca de Tiempo</th>
+                  <th>Hash Anonimizado (IP)</th>
+                  <th>Ruta Protegida</th>
+                  <th>Acción Tomada</th>
+                  <th>Razón / Motor</th>
+                  <th>Risk Score</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyEvents">
+                <!-- Llenado dinámico -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- MÓDULO 1: GESTIÓN DE SITIOS Y APLICACIONES -->
+      <!-- ======================================================== -->
+      <section class="module-section" id="secModulo1">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+              Sitio Protegido Activo
+            </h3>
+            <button class="btn btn-sm" id="btnNuevoSitio" onclick="window.App.mostrarModalNuevoSitio()">+ Registrar Nuevo Dominio</button>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label>Dominio Registrado:</label>
+            <input type="text" class="form-control" id="siteDomain" value="tramites.gob.ve" readonly>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+            <div>
+              <label style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Site Key (Pública para el SDK):</label>
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <input type="text" class="form-control" id="siteKeyDisplay" value="vh_site_9f8e7d6c5b4a3210" readonly>
+                <button class="btn btn-secondary btn-sm" onclick="window.App.copiarTexto('siteKeyDisplay')">Copiar</button>
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Secret Key (Privada para Backend Institucional):</label>
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <input type="password" class="form-control" id="secretKeyDisplay" value="vh_sec_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" readonly>
+                <button class="btn btn-secondary btn-sm" onclick="window.App.togglePassword('secretKeyDisplay')">Ver</button>
+                <button class="btn btn-secondary btn-sm" onclick="window.App.copiarTexto('secretKeyDisplay')">Copiar</button>
+              </div>
+            </div>
+          </div>
+
+          <h4 style="font-size: 14px; margin-bottom: 12px; color: var(--text-main);">Rutas Protegidas y Límites por Endpoint:</h4>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Prefijo de Ruta</th>
+                  <th>Métodos Permitidos</th>
+                  <th>Token Requerido</th>
+                  <th>Límite de Tasa (RPM)</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyRoutes">
+                <tr>
+                  <td><code>/login</code></td>
+                  <td><span class="badge badge-info">POST</span></td>
+                  <td><span class="badge badge-success">Sí (Obligatorio)</span></td>
+                  <td>10 peticiones / min</td>
+                  <td><button class="btn btn-secondary btn-sm" disabled>Fija</button></td>
+                </tr>
+                <tr>
+                  <td><code>/api/consulta</code></td>
+                  <td><span class="badge badge-info">GET, POST</span></td>
+                  <td><span class="badge badge-success">Sí (Obligatorio)</span></td>
+                  <td>30 peticiones / min</td>
+                  <td><button class="btn btn-secondary btn-sm" disabled>Fija</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- MÓDULO 2: MOTOR DE REGLAS Y MITIGACIÓN -->
+      <!-- ======================================================== -->
+      <section class="module-section" id="secModulo2">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Políticas de Mitigación y Umbrales de Inteligencia Artificial
+            </h3>
+            <button class="btn btn-sm" id="btnGuardarPoliticas" onclick="window.App.guardarPoliticas()">Guardar Cambios</button>
+          </div>
+
+          <!-- Selector de Modo de Mitigación -->
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label>Modo de Operación Perimetral:</label>
+            <select id="policyMode" class="form-control">
+              <option value="challenge">challenge — Verificación pasiva + Reto espacial escalado si hay sospecha</option>
+              <option value="monitor">monitor — Solo auditoría y registro sin bloqueo activo</option>
+              <option value="block">block — Bloqueo estricto inmediato ante cualquier sospecha</option>
+            </select>
+          </div>
+
+          <!-- Sliders de Umbrales de IA -->
+          <div class="slider-container">
+            <div class="slider-header">
+              <span>Umbral Mínimo para Desafío Interactivo (<code>challenge_min</code>):</span>
+              <span class="slider-val" id="valChallengeMin">0.35</span>
+            </div>
+            <input type="range" class="custom-range" id="sliderChallengeMin" min="0.05" max="0.95" step="0.01" value="0.35" oninput="window.App.onSliderChange('valChallengeMin', this.value)">
+            <span style="font-size: 11px; color: var(--text-muted);">Scores iguales o superiores a este valor escalan a reto espacial interactivo.</span>
+          </div>
+
+          <div class="slider-container">
+            <div class="slider-header">
+              <span>Umbral de Bloqueo Inmediato de Bots (<code>block_min</code>):</span>
+              <span class="slider-val" id="valBlockMin">0.75</span>
+            </div>
+            <input type="range" class="custom-range" id="sliderBlockMin" min="0.50" max="0.99" step="0.01" value="0.75" oninput="window.App.onSliderChange('valBlockMin', this.value)">
+            <span style="font-size: 11px; color: var(--text-muted);">Scores iguales o superiores a este valor son bloqueados en el borde con HTTP 403 (BOT_BLOCKED).</span>
+          </div>
+
+          <!-- Rate Limiting Global -->
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label>Rate Limiting Global por IP (Peticiones por Minuto):</label>
+            <input type="number" id="globalRateLimit" class="form-control" value="120" style="max-width: 200px;">
+          </div>
+
+          <!-- Listas Blancas y Negras -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+              <label style="font-size: 13px; font-weight: 500; color: var(--text-muted);">Lista Blanca de IPs / CIDR:</label>
+              <textarea id="ipWhitelist" class="form-control" rows="4" style="margin-top: 6px;">127.0.0.1&#10;10.0.0.0/8</textarea>
+              <span style="font-size: 11px; color: var(--text-muted);">Una IP/CIDR por línea (sin bloqueo).</span>
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 500; color: var(--text-muted);">Lista Negra de IPs / CIDR:</label>
+              <textarea id="ipBlacklist" class="form-control" rows="4" style="margin-top: 6px;">198.51.100.42</textarea>
+              <span style="font-size: 11px; color: var(--text-muted);">Una IP/CIDR por línea (bloqueo inmediato).</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- MÓDULO 3: BÓVEDA CRIPTOGRÁFICA LOCAL -->
+      <!-- ======================================================== -->
+      <section class="module-section" id="secModulo3">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Bóveda Criptográfica Soberana (Ed25519)
+            </h3>
+            <button class="btn btn-sm btn-danger" id="btnRotarClave" onclick="window.App.rotarClaveCripto()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Rotar Clave Asimétrica Ahora
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+            <div class="stat-card">
+              <span class="stat-label">Algoritmo de Firma</span>
+              <span class="stat-value" style="font-size: 20px;">EdDSA / Ed25519</span>
+              <span class="stat-desc">Curva elíptica de alta seguridad</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Identificador de Clave Activa (KID)</span>
+              <span class="stat-value" style="font-size: 20px;" id="valKid">key-2026-01</span>
+              <span class="stat-desc">Sincronizado con Borde OpenResty</span>
+            </div>
+            <div class="stat-card success">
+              <span class="stat-label">Cifrado de Claves en Reposo</span>
+              <span class="stat-value" style="font-size: 20px;">AES-256-GCM</span>
+              <span class="stat-desc">Bóveda aislada on-premise</span>
+            </div>
+          </div>
+
+          <h4 style="font-size: 14px; margin-bottom: 8px;">Clave Pública PEM Vigente (Distribución a Borde y Verificadores):</h4>
+          <div class="code-viewer" id="pemViewer">Cargando clave pública...</div>
+          <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
+            <button class="btn btn-secondary btn-sm" onclick="window.App.copiarTexto('pemViewer')">Copiar Clave PEM</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- MÓDULO 5: GESTIÓN DEL MODELO DE IA LOCAL -->
+      <!-- ======================================================== -->
+      <section class="module-section" id="secModulo5">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A7 7 0 0 1 5.07 11H5a1 1 0 0 1 0-2h.07A7 7 0 0 1 11 3.07V3a1 1 0 0 1 2 0v.07A7 7 0 0 1 18.93 9H19a1 1 0 0 1 0 2h-.07A7 7 0 0 1 13 16.93z"/></svg>
+              Modelo de Inteligencia Artificial Conductual en Producción
+            </h3>
+            <span class="badge badge-success">ONNX Runtime Local Activo</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+            <div class="stat-card">
+              <span class="stat-label">Versión del Modelo</span>
+              <span class="stat-value" style="font-size: 18px;" id="aiModelVersion">lgbm-conductual-v1.0.0</span>
+              <span class="stat-desc">LightGBM ONNX export</span>
+            </div>
+            <div class="stat-card success">
+              <span class="stat-label">Precisión (Accuracy)</span>
+              <span class="stat-value" style="font-size: 18px;" id="aiModelAccuracy">98.4 %</span>
+              <span class="stat-desc">En conjunto de prueba sintético</span>
+            </div>
+            <div class="stat-card accent">
+              <span class="stat-label">Latencia Promedio</span>
+              <span class="stat-value" style="font-size: 18px;" id="aiModelAvg">3.8 ms</span>
+              <span class="stat-desc">Inferencia en RAM</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Latencia Percentil P99</span>
+              <span class="stat-value" style="font-size: 18px;" id="aiModelP99">11.2 ms</span>
+              <span class="stat-desc">&lt; 50 ms límite estricto</span>
+            </div>
+          </div>
+
+          <h4 style="font-size: 14px; margin-bottom: 8px;">Carga de Nuevos Pesos de IA (.onnx) — Recarga en Caliente sin Caída:</h4>
+          <div class="dropzone" id="dropZone" onclick="document.getElementById('fileOnnx').click()">
+            <input type="file" id="fileOnnx" accept=".onnx" style="display: none;" onchange="window.App.onFileSelected(this)">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" style="margin-bottom: 12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div style="font-size: 14px; font-weight: 600;" id="dropzoneText">Arrastre aquí el nuevo archivo de modelo .onnx o haga clic para seleccionar</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Valida formato binario ONNX y realiza intercambio seguro en memoria (Thread-Safe)</div>
+          </div>
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+            <button class="btn btn-sm" id="btnUploadModel" onclick="window.App.subirModelo()" disabled>Cargar e Intercambiar Pesos</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- MÓDULO 6: AUDITORÍA INMUTABLE CON CADENA CRIPTOGRÁFICA -->
+      <!-- ======================================================== -->
+      <section class="module-section" id="secModulo6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Bitácora de Auditoría Inmutable (Encadenamiento Criptográfico SHA-256)
+            </h3>
+            <button class="btn btn-secondary btn-sm" onclick="window.App.verificarCadenaAuditoria()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Recalcular Integridad de la Cadena
+            </button>
+          </div>
+
+          <div class="integrity-banner valid" id="bannerIntegridad">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            <div>
+              <div style="font-weight: 600; font-size: 14px;" id="integrityTitle">Integridad Criptográfica de la Cadena: 100% VÁLIDA (chain_integrity_valid: true)</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Cada entrada contiene entry_hash = SHA256(prev_hash + payload + timestamp). No se detecta ninguna alteración retrospectiva.</div>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th># ID</th>
+                  <th>Fecha y Hora (UTC)</th>
+                  <th>Usuario Actuante</th>
+                  <th>Rol</th>
+                  <th>Acción Realizada</th>
+                  <th>Recurso Afectado</th>
+                  <th>Hash Previo (prev_hash)</th>
+                  <th>Hash de Entrada (entry_hash)</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyAudit">
+                <!-- Llenado dinámico -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Lógica de la Consola -->
+  <script src="app.js"></script>
+</body>
+</html>
