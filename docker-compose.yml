@@ -12,17 +12,26 @@ services:
       - perimetral
       - soberana_interna
     depends_on:
+      - backend-nucleo
       - demo-institucional
 
-  demo-institucional:
+  # Backend Núcleo Soberano (Dev 1)
+  backend-nucleo:
     build:
-      context: ./demo-institucional
+      context: ./backend-nucleo
       dockerfile: Dockerfile
-    container_name: demo-institucional
+    container_name: backend-nucleo
     restart: unless-stopped
+    environment:
+      - IA_SERVICE_URL=http://ia-conductual:8001
+      - DATABASE_PATH=/app/data/backend_nucleo.db
+      - VAULT_MASTER_KEY=b2ade4ac9b2f32644150e2e35a7177a2b7ff35449618c2d4320b10006d4eb69b
     expose:
-      - "8080"
+      - "8000"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
     networks:
+      - perimetral
       - soberana_interna
     depends_on:
       - ia-conductual
@@ -41,6 +50,20 @@ services:
     networks:
       - soberana_interna
 
+  # Demo Institucional - Portal Ciudadano de Trámites (Dev 2)
+  demo-institucional:
+    build:
+      context: ./demo-institucional
+      dockerfile: Dockerfile
+    container_name: demo-institucional
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - soberana_interna
+    depends_on:
+      - ia-conductual
+
   # Consola Administrativa y de Observabilidad Web (Dev 3)
   consola-admin:
     build:
@@ -48,6 +71,9 @@ services:
       dockerfile: Dockerfile
     container_name: consola-admin
     restart: unless-stopped
+    environment:
+      - BACKEND_URL=http://backend-nucleo:8000
+      - IA_URL=http://ia-conductual:8001
     ports:
       - "${ADMIN_PORT:-3000}:3000"
     expose:
@@ -55,17 +81,8 @@ services:
     networks:
       - perimetral
       - soberana_interna
-
-  # Backend Núcleo (Dev 1 / Placeholder soberano)
-  backend-nucleo:
-    container_name: backend-nucleo
-    image: python:3.11-slim
-    command: ["python", "-m", "http.server", "8000"]
-    restart: unless-stopped
-    expose:
-      - "8000"
-    networks:
-      - soberana_interna
+    depends_on:
+      - backend-nucleo
 
 networks:
   perimetral:

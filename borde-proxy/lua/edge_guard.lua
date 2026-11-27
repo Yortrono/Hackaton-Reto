@@ -7,6 +7,7 @@
 local cjson = require("cjson.safe")
 local jwt = require("resty.jwt")
 local str = require("resty.string")
+local http = require("resty.http")
 
 local policies_cache = ngx.shared.policies_cache
 local rate_limit_store = ngx.shared.rate_limit_store
@@ -23,95 +24,121 @@ local function get_iso_timestamp()
     return os.date("!%Y-%m-%dT%H:%M:%SZ", ngx.time())
 end
 
-local function send_error(status, code, message, details)
-    ngx.status = status
-    ngx.header["Content-Type"] = "application/json; charset=utf-8"
-    local body = {
+-- Envío asíncrono no bloqueante de evento de seguridad a backend-nucleo
+local function report_security_event_async(action, route, reason, ip_hash, risk_score)
+    ngx.timer.at(0, function(premature)
+        if premature then return end
+        local httpc = http.new()
+        httpc:set_timeouts(2000, 2000, 2000)
+        local payload = cjson.encode({
+            action = action,
+            route = route,
+            reason = reason,
+            ip_hash = ip_hash,
+            risk_score = risk_score or 0.99
+        })
+        local res, err = httpc:request_uri("http://backend-nucleo:8000/api/v1/internal/events/ingest", {
+            method = "POST",
+            headers = { ["Content-Type"] = "application/json" },
+            body = payload
+        })
+        if not res or res.status ~= 200 then
+            ngx.log(ngx.ERR, "[edge_guard] Error reportando evento a backend: ", err or (res and res.status) or "desconocido")
+        end
+    end)
+end
+
+local function send_error(status_code, err_code, message, details)
+    local trace_id = generate_trace_id()
+    local payload = {
         error = {
-            code = code,
+            code = err_code,
             message = message,
-            details = details or {},
-            trace_id = generate_trace_id(),
-            timestamp = get_iso_timestamp()
+            trace_id = trace_id,
+            timestamp = get_iso_timestamp(),
+            details = details or {}
         }
     }
-    ngx.say(cjson.encode(body))
-    return ngx.exit(status)
+    ngx.status = status_code
+    ngx.header["Content-Type"] = "application/json; charset=utf-8"
+    ngx.header["X-Trace-ID"] = trace_id
+    ngx.say(cjson.encode(payload))
+    return ngx.exit(status_code)
 end
 
 -- ------------------------------------------------------------------------------
--- 1. Mitigación DDoS Capa 7 (Inspección Rápida en Cabeceras)
+-- 1. Cargar Política Activa desde Caché o Archivo Local
 -- ------------------------------------------------------------------------------
-local ua = ngx.var.http_user_agent
-if not ua or ua == "" then
+local policy_raw = policies_cache:get("policy_data")
+local policy = nil
+
+if policy_raw then
+    policy = cjson.decode(policy_raw)
+end
+
+if not policy or not policy.policy then
+    policy = {
+        mode = "challenge",
+        ai_thresholds = { challenge_min = 0.35, block_min = 0.75 },
+        rate_limit_global_rpm = 120,
+        protected_routes = {
+            { path_prefix = "/login", methods = {"POST"}, require_token = true, rate_limit_rpm = 10 },
+            { path_prefix = "/api/consulta", methods = {"GET", "POST"}, require_token = true, rate_limit_rpm = 30 }
+        },
+        ip_whitelist = {"127.0.0.1", "10.0.0.0/8"},
+        ip_blacklist = {"198.51.100.42"}
+    }
+else
+    policy = policy.policy
+end
+
+-- ------------------------------------------------------------------------------
+-- 2. Inspección Perimetral y Mitigación de Bots Básicos (Cabeceras y Límites L7)
+-- ------------------------------------------------------------------------------
+local client_ip = ngx.var.http_x_forwarded_for or ngx.var.remote_addr or "127.0.0.1"
+if string.find(client_ip, ",") then
+    client_ip = string.match(client_ip, "^([^,]+)")
+end
+
+local user_agent = ngx.var.http_user_agent
+if not user_agent or user_agent == "" then
+    report_security_event_async("blocked", ngx.var.uri, "missing_user_agent", "sha256:unknown", 0.99)
     return send_error(403, "BOT_BLOCKED", "Petición rechazada: Cabecera User-Agent obligatoria en el borde perimetral.", {
-        reason = "missing_user_agent"
+        client_ip = "anonimizada",
+        violation = "empty_user_agent"
     })
 end
 
-local content_length = tonumber(ngx.var.http_content_length or "0")
-if content_length and content_length > 1048576 then
-    return send_error(413, "INVALID_PAYLOAD", "Petición rechazada: El tamaño del payload excede el límite permitido de 1 MB.", {
+local content_length = tonumber(ngx.var.http_content_length) or 0
+if content_length > 1048576 then
+    return send_error(413, "PAYLOAD_TOO_LARGE", "El tamaño de la petición supera el límite permitido de 1 MB.", {
         max_bytes = 1048576,
         received_bytes = content_length
     })
 end
 
 -- ------------------------------------------------------------------------------
--- 2. Recuperar Políticas de Seguridad (Caché en Memoria o Fallback)
--- ------------------------------------------------------------------------------
-local policy_raw = policies_cache:get("policy_data")
-local policy_obj = nil
-
-if policy_raw then
-    policy_obj = cjson.decode(policy_raw)
-end
-
-if not policy_obj then
-    -- Fallback inmediato de emergencia
-    local f = io.open("/usr/local/openresty/nginx/default_policy.json", "r")
-    if f then
-        local c = f:read("*a")
-        f:close()
-        policy_obj = cjson.decode(c)
-    end
-end
-
-local policy = (policy_obj and policy_obj.policy) or {
-    mode = "challenge",
-    rate_limit_global_rpm = 120,
-    protected_routes = {
-        { path_prefix = "/login", methods = {"POST"}, require_token = true, rate_limit_rpm = 10 },
-        { path_prefix = "/api/consulta", methods = {"GET", "POST"}, require_token = true, rate_limit_rpm = 30 }
-    },
-    ip_blacklist = {"198.51.100.42"}
-}
-
-local client_ip = ngx.var.remote_addr or "127.0.0.1"
-
--- ------------------------------------------------------------------------------
--- 3. Lista Negra de IPs
+-- 3. Verificación de Listas Negras y Blancas de IP (CIDR / Exacta)
 -- ------------------------------------------------------------------------------
 if policy.ip_blacklist then
     for _, blocked_ip in ipairs(policy.ip_blacklist) do
         if client_ip == blocked_ip then
-            return send_error(403, "BOT_BLOCKED", "Acceso denegado: Dirección IP bloqueada por política perimetral.", {
-                ip_blocked = true
+            return send_error(403, "IP_BLOCKED", "Dirección IP bloqueada por política de seguridad soberana.", {
+                action = "drop_connection"
             })
         end
     end
 end
 
 -- ------------------------------------------------------------------------------
--- 4. Rate Limiting Multicapa con Anonimización Efímera de IP (SHA-1/SHA-256)
+-- 4. Rate Limiting Multicapa con Anonimización Efímera de IP
 -- ------------------------------------------------------------------------------
 local salt = "soberania_local_2026_salt"
-local ip_hash = ngx.encode_base64(ngx.sha1_bin(client_ip .. salt))
+local ip_hash_val = "sha256:" .. str.to_hex(ngx.sha1_bin(client_ip .. salt)):sub(1, 12) .. "..."
 
 local uri = ngx.var.uri
 local method = ngx.req.get_method()
 
--- Determinar límite de peticiones según la ruta
 local limit_rpm = policy.rate_limit_global_rpm or 120
 local matched_route = nil
 
@@ -127,15 +154,15 @@ if policy.protected_routes then
     end
 end
 
--- Ventana de 60 segundos
 local current_slot = math.floor(ngx.time() / 60)
 local route_tag = matched_route and matched_route.path_prefix or "global"
-local rl_key = ip_hash .. ":" .. route_tag .. ":" .. current_slot
+local rl_key = ip_hash_val .. ":" .. route_tag .. ":" .. current_slot
 
 local count, err = rate_limit_store:incr(rl_key, 1, 0, 65)
 
 if count and count > limit_rpm then
     ngx.header["Retry-After"] = "60"
+    report_security_event_async("rate_limited", uri, "rpm_threshold_exceeded", ip_hash_val, 0.85)
     return send_error(429, "RATE_LIMIT_EXCEEDED", "Límite de peticiones por minuto excedido en el borde perimetral.", {
         limit_rpm = limit_rpm,
         current_requests = count,
@@ -145,7 +172,7 @@ if count and count > limit_rpm then
 end
 
 -- ------------------------------------------------------------------------------
--- 5. Verificación de Rutas Protegidas y Validación de Token JWT Asimétrico
+-- 5. Verificación de Rutas Protegidas y Validación de Token JWT
 -- ------------------------------------------------------------------------------
 local require_token = false
 if matched_route and matched_route.require_token then
@@ -163,12 +190,12 @@ end
 
 local policy_mode = policy.mode or "challenge"
 
--- Si la ruta requiere token y el modo de operación no es monitor pasivo
 if require_token and policy_mode ~= "monitor" then
     local headers = ngx.req.get_headers()
     local token = headers["x-human-token"] or ngx.var.cookie_vh_token
 
     if not token or token == "" then
+        report_security_event_async("blocked", uri, "token_required_missing", ip_hash_val, 0.95)
         return send_error(401, "VERIFICATION_REQUIRED", "Se requiere token de verificación humana válido para acceder a esta ruta.", {
             policy_mode = policy_mode,
             protected_route = uri,
@@ -176,28 +203,25 @@ if require_token and policy_mode ~= "monitor" then
         })
     end
 
-    -- Validar formato y firma del JWT
     local jwt_obj = jwt:load_jwt(token)
     if not jwt_obj.valid then
+        report_security_event_async("blocked", uri, "invalid_jwt_signature", ip_hash_val, 0.98)
         return send_error(401, "INVALID_TOKEN", "Estructura de token JWT inválida o malformada.", {
             reason = jwt_obj.reason or "invalid_jwt_structure"
         })
     end
 
-    -- Validar expiración (exp)
     local exp = jwt_obj.payload and jwt_obj.payload.exp
     if exp and tonumber(exp) < ngx.time() then
+        report_security_event_async("blocked", uri, "expired_token", ip_hash_val, 0.90)
         return send_error(401, "INVALID_TOKEN", "El token de verificación humana ha expirado.", {
             expired_at = exp,
             current_time = ngx.time()
         })
     end
 
-    -- Inyectar cabecera de contexto verificado para el backend
     ngx.req.set_header("X-Verified-Human", "true")
     if jwt_obj.payload and jwt_obj.payload.risk_score then
         ngx.req.set_header("X-Human-Risk-Score", tostring(jwt_obj.payload.risk_score))
     end
 end
-
--- Acceso autorizado
