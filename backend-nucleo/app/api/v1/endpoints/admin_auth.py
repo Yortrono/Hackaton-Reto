@@ -153,3 +153,49 @@ def verify_totp_endpoint(
     )
 
     return {"message": "MFA/TOTP activado exitosamente"}
+
+@router.get(
+    "/admin/auth/me",
+    summary="Obtener Información del Usuario Autenticado",
+    description="Retorna el perfil, rol y estado de MFA/TOTP del usuario activo."
+)
+def get_current_user_profile(
+    current_admin: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    username = current_admin["sub"]
+    user = db.query(AdminUserModel).filter(AdminUserModel.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail={"code": "INVALID_PAYLOAD", "message": "Usuario no encontrado"})
+    return {
+        "username": user.username,
+        "role": user.role,
+        "totp_enabled": bool(user.totp_enabled)
+    }
+
+@router.post(
+    "/admin/auth/disable-totp",
+    summary="Deshabilitar Segundo Factor MFA/TOTP",
+    description="Desactiva el segundo factor MFA para el usuario actual."
+)
+def disable_totp_endpoint(
+    current_admin: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    username = current_admin["sub"]
+    user = db.query(AdminUserModel).filter(AdminUserModel.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail={"code": "INVALID_PAYLOAD", "message": "Usuario no encontrado"})
+    user.totp_enabled = False
+    user.totp_secret = None
+    db.commit()
+    audit_service.record_action(
+        db=db,
+        actor_username=username,
+        actor_role=user.role,
+        action="TOTP_MFA_DISABLED",
+        resource=f"user:{username}",
+        payload_details={"username": username}
+    )
+    return {"message": "MFA/TOTP deshabilitado exitosamente"}
+

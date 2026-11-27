@@ -24,12 +24,22 @@ local function get_iso_timestamp()
     return os.date("!%Y-%m-%dT%H:%M:%SZ", ngx.time())
 end
 
--- Envío asíncrono no bloqueante de evento de seguridad a backend-nucleo
+-- Envío asíncrono no bloqueante de evento de seguridad a backend-nucleo con deduplicación
 local function report_security_event_async(action, route, reason, ip_hash, risk_score)
+    -- Deduplicación perimetral: evitar saturar el backend con ráfagas masivas de la misma IP
+    if ip_hash then
+        local rpt_key = "rpt:" .. ip_hash .. ":" .. action
+        local already = rate_limit_store:get(rpt_key)
+        if already then
+            return
+        end
+        rate_limit_store:set(rpt_key, true, 1) -- 1 segundo de deduplicación
+    end
+
     ngx.timer.at(0, function(premature)
         if premature then return end
         local httpc = http.new()
-        httpc:set_timeouts(2000, 2000, 2000)
+        httpc:set_timeouts(400, 400, 400)
         local payload = cjson.encode({
             action = action,
             route = route,
@@ -42,8 +52,8 @@ local function report_security_event_async(action, route, reason, ip_hash, risk_
             headers = { ["Content-Type"] = "application/json" },
             body = payload
         })
-        if not res or res.status ~= 200 then
-            ngx.log(ngx.ERR, "[edge_guard] Error reportando evento a backend: ", err or (res and res.status) or "desconocido")
+        if res and res.status == 200 then
+            httpc:set_keepalive(10000, 50)
         end
     end)
 end

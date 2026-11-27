@@ -10,33 +10,96 @@
 
 <body>
 
-  <!-- MODAL DE AUTENTICACIÓN / MFA (Solo si no hay sesión iniciada) -->
+  <!-- MODAL DE AUTENTICACIÓN / GESTIÓN DE MFA -->
   <div class="auth-overlay" id="authOverlay" style="display: none;">
-    <div class="auth-card">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h3 style="font-size: 18px; color: #fff;">Autenticación Soberana</h3>
-        <p style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Acceso con RBAC y Segundo Factor MFA/TOTP</p>
+    <div class="auth-card" style="width: 450px; max-width: 95vw;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 17px; color: #fff; margin: 0;">Seguridad y Acceso Soberano</h3>
+        <button type="button" onclick="window.App.toggleUserMenu()" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer;">✕</button>
       </div>
-      <form onsubmit="event.preventDefault(); window.App.login();">
-        <div style="margin-bottom: 14px;">
-          <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Usuario:</label>
-          <select id="username" class="form-control" onchange="window.App.onUserSelectChange(this.value)">
-            <option value="admin_seguridad">admin_seguridad (Admin de Seguridad)</option>
-            <option value="operador_politicas">operador_politicas (Operador de Políticas)</option>
-            <option value="auditor_fiscal">auditor_fiscal (Auditor Fiscal)</option>
-          </select>
+
+      <!-- Pestañas de Navegación del Modal -->
+      <div style="display: flex; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid var(--border-card); padding-bottom: 8px;">
+        <button type="button" class="filter-btn active" id="tabBtnLogin" onclick="window.App.switchAuthTab('login')">
+          1. Sesión y Roles (RBAC)
+        </button>
+        <button type="button" class="filter-btn" id="tabBtnMfa" onclick="window.App.switchAuthTab('mfa')">
+          2. Segundo Factor (MFA/TOTP)
+        </button>
+      </div>
+
+      <!-- SECCIÓN 1: LOGIN Y CAMBIO DE USUARIO (RBAC) -->
+      <div id="authSectionLogin">
+        <form onsubmit="event.preventDefault(); window.App.login();">
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Seleccionar Perfil / Rol:</label>
+            <select id="username" class="form-control" onchange="window.App.onUserSelectChange(this.value)">
+              <option value="admin_seguridad">admin_seguridad (Admin de Seguridad)</option>
+              <option value="operador_politicas">operador_politicas (Operador de Políticas)</option>
+              <option value="auditor_fiscal">auditor_fiscal (Auditor Fiscal)</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Contraseña:</label>
+            <input type="password" id="password" class="form-control" value="Soberania2026!Segura" required>
+          </div>
+          <div style="margin-bottom: 18px;">
+            <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Código TOTP (Solo si está habilitado en la cuenta):</label>
+            <input type="text" id="totp" class="form-control" value="" placeholder="Dejar vacío si no tiene MFA activo" maxlength="6">
+            <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: block;">* Si la cuenta no tiene MFA habilitado, déjelo vacío para entrar directamente.</span>
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%;">Ingresar / Cambiar de Usuario</button>
+        </form>
+      </div>
+
+      <!-- SECCIÓN 2: ACTIVACIÓN Y CONFIGURACIÓN VISUAL DE MFA/TOTP -->
+      <div id="authSectionMfa" style="display: none;">
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-card); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-size: 12.5px; color: #94a3b8; margin-bottom: 6px;">
+            Usuario Activo: <strong id="mfaActiveUserText" style="color: #fff;">admin_seguridad</strong>
+          </div>
+          <div style="font-size: 12.5px; color: #94a3b8; display: flex; align-items: center; justify-content: space-between;">
+            <span>Estado de Segundo Factor:</span>
+            <span id="mfaStatusBadge" class="action-pill bloqueo">● Desactivado</span>
+          </div>
         </div>
-        <div style="margin-bottom: 14px;">
-          <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Contraseña:</label>
-          <input type="password" id="password" class="form-control" value="Soberania2026!Segura" required>
+
+        <!-- Panel cuando MFA está inactivo: Proceso de Activación -->
+        <div id="mfaInactivePanel">
+          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
+            Configure un autenticador TOTP estándar (RFC 6238) como FreeOTP, Aegis o Google Authenticator para proteger su cuenta con doble factor.
+          </p>
+          <button type="button" class="btn-primary" id="btnStartTotpSetup" onclick="window.App.startTotpSetup()" style="width: 100%; margin-bottom: 12px;">
+            1. Generar Semilla Criptográfica TOTP
+          </button>
+
+          <div id="mfaSecretDisplayArea" style="display: none; border-top: 1px dashed #334155; padding-top: 14px; margin-top: 12px;">
+            <label style="font-size: 11.5px; color: #38bdf8; display: block; margin-bottom: 4px;">Clave Secreta Base32 (Ingrese en su App Autenticadora):</label>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="txtTotpSecret" class="form-control" style="font-family: monospace; font-weight: 700; letter-spacing: 1px; color: #34d399;" readonly>
+              <button type="button" class="btn-primary" onclick="window.App.copyTotpSecret()" style="white-space: nowrap; padding: 6px 12px; font-size: 12px;">Copiar</button>
+            </div>
+            <label style="font-size: 11.5px; color: #94a3b8; display: block; margin-bottom: 4px;">Código de Confirmación (6 dígitos de su App):</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="txtTotpVerifyCode" class="form-control" placeholder="000000" maxlength="6" style="letter-spacing: 2px; font-size: 15px; font-weight: 700; text-align: center;">
+              <button type="button" class="btn-primary" onclick="window.App.confirmTotpActivation()" style="white-space: nowrap; padding: 6px 14px; font-size: 12px;">2. Activar MFA</button>
+            </div>
+          </div>
         </div>
-        <div style="margin-bottom: 18px;">
-          <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Código TOTP (Opcional si
-            no está habilitado):</label>
-          <input type="text" id="totp" class="form-control" value="" placeholder="123456" maxlength="6">
+
+        <!-- Panel cuando MFA está activo: Opción de Desactivar -->
+        <div id="mfaActivePanel" style="display: none; text-align: center; padding: 12px 0;">
+          <div style="color: #34d399; font-size: 14px; font-weight: 700; margin-bottom: 8px;">
+            ✓ Segundo Factor MFA/TOTP Activo y Protegido
+          </div>
+          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 14px;">
+            Su cuenta requiere el código dinámico de 6 dígitos en cada inicio de sesión.
+          </p>
+          <button type="button" class="btn-danger" onclick="window.App.disableTotp()" style="width: 100%;">
+            Deshabilitar Segundo Factor (MFA)
+          </button>
         </div>
-        <button type="submit" class="btn-primary" style="width: 100%;">Ingresar a la Consola</button>
-      </form>
+      </div>
     </div>
   </div>
 
@@ -80,7 +143,7 @@
         </div>
         <div class="user-info-text">
           <div class="user-title" id="displayUsername">ADMIN DE SEGURIDAD</div>
-          <div class="user-subtitle">(MFA Activo)</div>
+          <div class="user-subtitle" id="displayMfaStatus">(MFA Desactivado)</div>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
           <polyline points="6 9 12 15 18 9" />

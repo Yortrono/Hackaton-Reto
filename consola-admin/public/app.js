@@ -58,6 +58,7 @@
             state.user = 'ADMIN DE SEGURIDAD';
             self.applyRbacUI();
             self.loadActiveViewData();
+            self.checkMfaStatus();
           }
         })
         .catch(function () {});
@@ -167,12 +168,173 @@
           state.user = sel.value === 'admin_seguridad' ? 'ADMIN DE SEGURIDAD' : (sel.value === 'operador_politicas' ? 'OPERADOR DE POLÍTICAS' : 'AUDITOR FISCAL');
           
           self.applyRbacUI();
+          self.checkMfaStatus();
           document.getElementById('authOverlay').style.display = 'none';
           self.showToast('Sesión autenticada como ' + state.user + ' con éxito.');
           self.loadActiveViewData();
         })
         .catch(function (err) {
           self.showToast('Error de autenticación: Verifique credenciales.');
+        });
+    },
+
+    // =========================================================================
+    // GESTIÓN VISUAL DE MFA / TOTP (RFC 6238)
+    // =========================================================================
+    switchAuthTab: function (tab) {
+      var tabBtnLogin = document.getElementById('tabBtnLogin');
+      var tabBtnMfa = document.getElementById('tabBtnMfa');
+      var secLogin = document.getElementById('authSectionLogin');
+      var secMfa = document.getElementById('authSectionMfa');
+
+      if (tab === 'login') {
+        if (tabBtnLogin) tabBtnLogin.classList.add('active');
+        if (tabBtnMfa) tabBtnMfa.classList.remove('active');
+        if (secLogin) secLogin.style.display = 'block';
+        if (secMfa) secMfa.style.display = 'none';
+      } else {
+        if (tabBtnLogin) tabBtnLogin.classList.remove('active');
+        if (tabBtnMfa) tabBtnMfa.classList.add('active');
+        if (secLogin) secLogin.style.display = 'none';
+        if (secMfa) secMfa.style.display = 'block';
+        this.checkMfaStatus();
+      }
+    },
+
+    checkMfaStatus: function () {
+      if (!state.adminToken) return;
+
+      fetch('/api/v1/admin/auth/me', { headers: this.getHeaders() })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          var userText = document.getElementById('mfaActiveUserText');
+          if (userText) userText.textContent = data.username + ' (' + data.role + ')';
+
+          var badge = document.getElementById('mfaStatusBadge');
+          var dispSubtitle = document.getElementById('displayMfaStatus');
+          var inactivePanel = document.getElementById('mfaInactivePanel');
+          var activePanel = document.getElementById('mfaActivePanel');
+
+          if (data.totp_enabled) {
+            if (badge) {
+              badge.className = 'action-pill pasivo';
+              badge.textContent = '● Activo';
+            }
+            if (dispSubtitle) {
+              dispSubtitle.textContent = '(MFA Activo)';
+              dispSubtitle.style.color = '#34d399';
+            }
+            if (inactivePanel) inactivePanel.style.display = 'none';
+            if (activePanel) activePanel.style.display = 'block';
+          } else {
+            if (badge) {
+              badge.className = 'action-pill bloqueo';
+              badge.textContent = '● Desactivado';
+            }
+            if (dispSubtitle) {
+              dispSubtitle.textContent = '(MFA Desactivado)';
+              dispSubtitle.style.color = '#94a3b8';
+            }
+            if (inactivePanel) inactivePanel.style.display = 'block';
+            if (activePanel) activePanel.style.display = 'none';
+          }
+        })
+        .catch(function () {});
+    },
+
+    startTotpSetup: function () {
+      var self = this;
+      fetch('/api/v1/admin/auth/setup-totp', {
+        method: 'POST',
+        headers: this.getHeaders()
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          var txtSecret = document.getElementById('txtTotpSecret');
+          if (txtSecret) txtSecret.value = data.secret;
+
+          var area = document.getElementById('mfaSecretDisplayArea');
+          if (area) area.style.display = 'block';
+
+          self.showToast('Semilla TOTP generada. Ingrésela en su app autenticadora.');
+        })
+        .catch(function (err) {
+          self.showToast('Error al iniciar configuración TOTP: ' + err.message);
+        });
+    },
+
+    copyTotpSecret: function () {
+      var txtSecret = document.getElementById('txtTotpSecret');
+      if (txtSecret && txtSecret.value) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txtSecret.value)
+            .then(function () {
+              window.App.showToast('Clave secreta copiada al portapapeles.');
+            })
+            .catch(function () {
+              txtSecret.select();
+              document.execCommand('copy');
+              window.App.showToast('Clave copiada.');
+            });
+        } else {
+          txtSecret.select();
+          document.execCommand('copy');
+          window.App.showToast('Clave copiada.');
+        }
+      }
+    },
+
+    confirmTotpActivation: function () {
+      var self = this;
+      var codeInput = document.getElementById('txtTotpVerifyCode');
+      var code = codeInput ? codeInput.value.trim() : '';
+      if (!code || code.length !== 6) {
+        self.showToast('Ingrese un código de exactamente 6 dígitos.');
+        return;
+      }
+
+      fetch('/api/v1/admin/auth/verify-totp', {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ totp_code: code })
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Código TOTP inválido o expirado.');
+          return res.json();
+        })
+        .then(function () {
+          self.showToast('✓ Segundo Factor MFA/TOTP activado exitosamente.');
+          if (codeInput) codeInput.value = '';
+          var area = document.getElementById('mfaSecretDisplayArea');
+          if (area) area.style.display = 'none';
+          self.checkMfaStatus();
+        })
+        .catch(function (err) {
+          self.showToast('Error al activar: Verifique el código de su App.');
+        });
+    },
+
+    disableTotp: function () {
+      var self = this;
+      if (!confirm('¿Está seguro de desactivar el segundo factor MFA en esta cuenta?')) return;
+
+      fetch('/api/v1/admin/auth/disable-totp', {
+        method: 'POST',
+        headers: this.getHeaders()
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function () {
+          self.showToast('Segundo Factor MFA deshabilitado.');
+          self.checkMfaStatus();
+        })
+        .catch(function (err) {
+          self.showToast('Error al deshabilitar MFA: ' + err.message);
         });
     },
 
@@ -684,22 +846,20 @@
               state.isFirstPoll = false;
               state.lastVerifiedCount = curHumans;
               state.lastBlockedCount = curBots;
-              self.drawChart();
-              return;
+            } else {
+              var deltaHuman = Math.max(0, curHumans - (state.lastVerifiedCount || 0));
+              var deltaBots = Math.max(0, curBots - (state.lastBlockedCount || 0));
+
+              state.lastVerifiedCount = curHumans;
+              state.lastBlockedCount = curBots;
+
+              // Registro 100% puro y exacto del tráfico real recibido en la ventana
+              state.trafficPointsHuman.shift();
+              state.trafficPointsHuman.push(deltaHuman);
+
+              state.trafficPointsBots.shift();
+              state.trafficPointsBots.push(deltaBots);
             }
-
-            var deltaHuman = Math.max(0, curHumans - (state.lastVerifiedCount || 0));
-            var deltaBots = Math.max(0, curBots - (state.lastBlockedCount || 0));
-
-            state.lastVerifiedCount = curHumans;
-            state.lastBlockedCount = curBots;
-
-            // Registro 100% puro y exacto del tráfico real recibido en la ventana
-            state.trafficPointsHuman.shift();
-            state.trafficPointsHuman.push(deltaHuman);
-
-            state.trafficPointsBots.shift();
-            state.trafficPointsBots.push(deltaBots);
 
             self.drawChart();
           }
