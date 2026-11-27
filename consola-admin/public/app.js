@@ -90,10 +90,12 @@
       if (activeBtn) activeBtn.classList.add('active');
       if (activeSec) activeSec.classList.add('active');
 
+      this.applyRbacUI();
       this.loadActiveViewData();
     },
 
     loadActiveViewData: function () {
+      this.applyRbacUI();
       if (state.currentView === '4') {
         this.resizeCanvas();
       } else if (state.currentView === '1') {
@@ -114,22 +116,30 @@
       if (displayUser) displayUser.textContent = state.user;
 
       // Restricciones visuales por rol (RBAC)
+      var btnCrearSitio = document.querySelector('#view1 button.btn-primary');
       var btnRotar = document.querySelector('#view3 button.btn-danger');
       var btnGuardarPol = document.querySelector('#view2 button.btn-primary');
       var boxUploadAi = document.querySelector('#view5 div[style*="dashed"]');
+      var policyInputs = document.querySelectorAll('#view2 input, #view2 select');
 
       if (state.role === 'auditor') {
+        if (btnCrearSitio) btnCrearSitio.style.display = 'none';
         if (btnRotar) btnRotar.style.display = 'none';
         if (btnGuardarPol) btnGuardarPol.style.display = 'none';
         if (boxUploadAi) boxUploadAi.style.display = 'none';
+        policyInputs.forEach(function (el) { el.disabled = true; });
       } else if (state.role === 'operator') {
+        if (btnCrearSitio) btnCrearSitio.style.display = 'inline-block';
         if (btnRotar) btnRotar.style.display = 'none';
         if (btnGuardarPol) btnGuardarPol.style.display = 'block';
         if (boxUploadAi) boxUploadAi.style.display = 'none';
+        policyInputs.forEach(function (el) { el.disabled = false; });
       } else {
+        if (btnCrearSitio) btnCrearSitio.style.display = 'inline-block';
         if (btnRotar) btnRotar.style.display = 'block';
         if (btnGuardarPol) btnGuardarPol.style.display = 'block';
         if (boxUploadAi) boxUploadAi.style.display = 'block';
+        policyInputs.forEach(function (el) { el.disabled = false; });
       }
     },
 
