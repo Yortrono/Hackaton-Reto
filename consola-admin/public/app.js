@@ -347,25 +347,81 @@
         .then(function (res) { return res.json(); })
         .then(function (sites) {
           if (Array.isArray(sites) && sites.length > 0) {
-            var s = sites[0];
-            state.activeSiteId = s.site_id;
-            var txtSk = document.getElementById('txtSiteKey');
-            var txtSid = document.getElementById('txtSiteId');
-            if (txtSk) txtSk.value = s.site_key;
-            if (txtSid) txtSid.value = s.site_id + ' (' + s.name + ')';
+            state.sitesList = sites;
+
+            // Actualizar contador en título
+            var countEl = document.getElementById('txtSitesCount');
+            if (countEl) countEl.textContent = '(Total: ' + sites.length + ' sitio' + (sites.length > 1 ? 's' : '') + ')';
+
+            // Actualizar selector dropdown
+            var selSite = document.getElementById('selActiveSite');
+            if (selSite) {
+              selSite.innerHTML = '';
+              sites.forEach(function (s) {
+                var opt = document.createElement('option');
+                opt.value = s.site_id;
+                opt.textContent = s.name + ' (' + s.site_id + ')';
+                if (s.site_id === state.activeSiteId) opt.selected = true;
+                selSite.appendChild(opt);
+              });
+            }
+
+            // Actualizar tabla del catálogo de todos los sitios
+            var allTbody = document.getElementById('allSitesTableBody');
+            if (allTbody) {
+              allTbody.innerHTML = '';
+              sites.forEach(function (s) {
+                var tr = document.createElement('tr');
+                var isSelected = (s.site_id === (state.activeSiteId || 'default'));
+                tr.innerHTML = [
+                  '<td><strong>' + s.name + '</strong></td>',
+                  '<td><code>' + s.site_id + '</code></td>',
+                  '<td><span style="color: #94a3b8;">' + (s.domain || '-') + '</span></td>',
+                  '<td><code style="color: #38bdf8;">' + s.site_key + '</code></td>',
+                  '<td><span class="action-pill pasivo">● Activo</span></td>',
+                  '<td style="text-align: center;"><button class="btn-primary" style="padding: 4px 10px; font-size: 11px;' + (isSelected ? ' background: #059669;' : '') + '" onclick="window.App.selectSite(\'' + s.site_id + '\')">' + (isSelected ? '✓ Seleccionado' : 'Seleccionar') + '</button></td>'
+                ].join('');
+                allTbody.appendChild(tr);
+              });
+            }
+
+            // Si no hay sitio activo seleccionado, tomar el primero o mantener el actual
+            var currentId = state.activeSiteId || sites[0].site_id;
+            self.selectSite(currentId, false);
           }
         })
         .catch(function () {});
+    },
 
-      // Obtener rutas protegidas del sitio
-      fetch('/api/v1/policies/default')
+    selectSite: function (siteId, reFetchList) {
+      state.activeSiteId = siteId;
+      var s = (state.sitesList || []).find(function (item) { return item.site_id === siteId; });
+      if (s) {
+        var txtSk = document.getElementById('txtSiteKey');
+        var txtSid = document.getElementById('txtSiteId');
+        var txtName = document.getElementById('txtSiteName');
+        var txtDom = document.getElementById('txtSiteDomain');
+        var selSite = document.getElementById('selActiveSite');
+
+        if (txtSk) txtSk.value = s.site_key;
+        if (txtSid) txtSid.value = s.site_id;
+        if (txtName) txtName.value = s.name;
+        if (txtDom) txtDom.value = s.domain || '-';
+        if (selSite) selSite.value = s.site_id;
+      }
+
+      // Obtener rutas protegidas del sitio seleccionado
+      fetch('/api/v1/policies/' + siteId)
         .then(function (res) { return res.json(); })
         .then(function (data) {
-          if (data.policy && data.policy.protected_routes) {
-            var tbody = document.getElementById('routesTableBody');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-            data.policy.protected_routes.forEach(function (r) {
+          var tbody = document.getElementById('routesTableBody');
+          if (!tbody) return;
+          tbody.innerHTML = '';
+          var routes = (data.policy && data.policy.protected_routes) ? data.policy.protected_routes : [];
+          if (routes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #94a3b8; font-size: 12px; padding: 12px;">Sin rutas específicas personalizadas. Aplica las políticas y límites globales de mitigación.</td></tr>';
+          } else {
+            routes.forEach(function (r) {
               var tr = document.createElement('tr');
               tr.innerHTML = [
                 '<td><code>' + r.path_prefix + '</code></td>',
@@ -378,15 +434,26 @@
           }
         })
         .catch(function () {});
+
+      if (reFetchList === true) {
+        this.fetchSites();
+      }
+    },
+
+    onSiteSelectChange: function (siteId) {
+      this.selectSite(siteId, true);
     },
 
     promptCreateSite: function () {
       var self = this;
-      var siteName = prompt('Nombre de la aplicación institucional a proteger:', 'Portal Registro Civil');
-      if (!siteName) return;
-      var domain = prompt('Dominio FQDN local del sitio:', 'registrocivil.gob.local');
-      if (!domain) return;
-      var siteId = siteName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      var siteName = prompt('Nombre de la nueva aplicación institucional a proteger:', 'Portal Saime');
+      if (!siteName || siteName.trim() === '') return;
+      siteName = siteName.trim();
+      var defaultDomain = siteName.toLowerCase().replace(/[^a-z0-9]/g, '') + '.gob.ve';
+      var domain = prompt('Dominio FQDN local del sitio:', defaultDomain);
+      if (!domain || domain.trim() === '') return;
+      domain = domain.trim();
+      var siteId = siteName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
       fetch('/api/v1/admin/sites', {
         method: 'POST',
@@ -397,17 +464,23 @@
           domain: domain
         })
       })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          if (data.site_key) {
-            self.showToast('Sitio registrado: ' + data.name + ' (Key: ' + data.site_key + ')');
+        .then(function (res) {
+          return res.json().then(function (data) {
+            return { ok: res.ok, status: res.status, data: data };
+          });
+        })
+        .then(function (result) {
+          if (result.ok && result.data.site_key) {
+            self.showToast('✓ Sitio registrado exitosamente: ' + result.data.name);
+            state.activeSiteId = result.data.site_id;
             self.fetchSites();
           } else {
-            self.showToast('No se pudo crear el sitio.');
+            var msg = (result.data.error && result.data.error.message) || (result.data.detail && result.data.detail.message) || 'No se pudo crear el sitio.';
+            self.showToast('Aviso: ' + msg);
           }
         })
         .catch(function (err) {
-          self.showToast('Error al registrar sitio: ' + err.message);
+          self.showToast('Error de conexión: ' + err.message);
         });
     },
 

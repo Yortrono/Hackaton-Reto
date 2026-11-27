@@ -329,25 +329,47 @@
       <!-- VISTA 1: SITIOS Y APLICACIONES -->
       <!-- ======================================================== -->
       <section class="view-section" id="view1">
-        <h2 class="module-header-title">MÓDULO 1: GESTIÓN DE SITIOS Y APLICACIONES</h2>
-        <div class="chart-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-            <span class="chart-title">Sitio Activo Protegido</span>
-            <button class="btn-primary" onclick="window.App.promptCreateSite()">+ Registrar Nuevo Sitio</button>
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <h2 class="module-header-title">MÓDULO 1: GESTIÓN DE SITIOS Y APLICACIONES (MULTITENANCY)</h2>
+        
+        <!-- TARJETA: SITIO ACTIVO SELECCIONADO -->
+        <div class="chart-card" style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
             <div>
-              <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Site Key (Pública para
-                el SDK):</label>
-              <input type="text" id="txtSiteKey" class="form-control" value="vh_site_9f8e7d6c5b4a3210" readonly>
+              <span class="chart-title">Sitio Activo en Supervisión</span>
+              <span style="font-size: 12px; color: #94a3b8; display: block; margin-top: 2px;">Seleccione el sitio institucional para consultar sus claves SDK y políticas perimetrales:</span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <select id="selActiveSite" class="form-control" style="min-width: 250px;" onchange="window.App.onSiteSelectChange(this.value)">
+                <!-- Sitios dinámicos -->
+              </select>
+              <button class="btn-primary" onclick="window.App.promptCreateSite()">+ Registrar Nuevo Sitio</button>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div>
+              <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Nombre de la Aplicación:</label>
+              <input type="text" id="txtSiteName" class="form-control" value="Portal Institucional Soberano" readonly>
             </div>
             <div>
-              <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Identificador del
-                Sitio (Site ID):</label>
+              <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Identificador del Sitio (Site ID):</label>
               <input type="text" id="txtSiteId" class="form-control" value="default" readonly>
             </div>
+            <div>
+              <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Dominio FQDN Local:</label>
+              <input type="text" id="txtSiteDomain" class="form-control" value="gobierno.gob.ve" readonly>
+            </div>
           </div>
-          <h4 style="font-size: 13px; color: #f8fafc; margin-bottom: 10px;">Rutas Protegidas y Políticas Asociadas</h4>
+
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; color: #38bdf8; display: block; margin-bottom: 4px;">Site Key (Pública para integración del SDK Cliente):</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="txtSiteKey" class="form-control" style="font-family: monospace; font-weight: 700; color: #34d399;" value="vh_site_9f8e7d6c5b4a3210" readonly>
+              <button type="button" class="btn-primary" style="white-space: nowrap; padding: 6px 14px; font-size: 12px;" onclick="navigator.clipboard.writeText(document.getElementById('txtSiteKey').value); window.App.showToast('✓ Site Key copiada al portapapeles');">Copiar Key</button>
+            </div>
+          </div>
+
+          <h4 style="font-size: 13px; color: #f8fafc; margin-bottom: 10px;">Rutas Protegidas y Políticas Asociadas a Este Sitio</h4>
           <table class="events-table">
             <thead>
               <tr>
@@ -370,6 +392,28 @@
                 <td><span class="action-pill pasivo">● Sí</span></td>
                 <td>30 rpm</td>
               </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TARJETA: CATÁLOGO DE TODOS LOS SITIOS REGISTRADOS -->
+        <div class="chart-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <span class="chart-title">Catálogo de Sitios y Aplicaciones Registradas <span id="txtSitesCount" style="color: #6ee7b7; font-size: 12px; margin-left: 6px;">(Total: 0)</span></span>
+          </div>
+          <table class="events-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Identificador (ID)</th>
+                <th>Dominio FQDN</th>
+                <th>Site Key</th>
+                <th>Estado</th>
+                <th style="text-align: center;">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="allSitesTableBody">
+              <!-- Cargado dinámicamente -->
             </tbody>
           </table>
         </div>
