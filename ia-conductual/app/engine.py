@@ -149,13 +149,29 @@ class BehavioralInferenceEngine:
 
         risk_score = max(0.0, min(1.0, risk_score))
 
-        # Clasificación según umbrales de seguridad soberana
-        if risk_score < t_human:
-            decision = "human"
-        elif risk_score < t_challenge:
+        # Manejo de ausencia inicial de telemetría (reposo):
+        # Si un usuario carga la página y no ha interactuado aún (event_count == 0 y key_count == 0)
+        # y no presenta señales explícitas de automatización (webdriver_flag == False),
+        # NO se debe clasificar como bot malicioso (>0.75), sino solicitar el reto interactivo (challenge = 0.50).
+        pm = telemetry.get("pointer_metrics") or {}
+        km = telemetry.get("keyboard_metrics") or {}
+        env = telemetry.get("environment_signals") or {}
+
+        has_webdriver = bool(env.get("webdriver_flag", False))
+        event_count = float(pm.get("event_count", 0))
+        key_count = float(km.get("key_count", 0))
+
+        if event_count == 0 and key_count == 0 and not has_webdriver:
+            risk_score = 0.50
             decision = "challenge"
         else:
-            decision = "bot"
+            # Clasificación según umbrales de seguridad soberana
+            if risk_score < t_human:
+                decision = "human"
+            elif risk_score < t_challenge:
+                decision = "challenge"
+            else:
+                decision = "bot"
 
         dt_ms = (time.perf_counter() - t0) * 1000.0
 

@@ -564,3 +564,53 @@ body {
   box-shadow: 0 10px 15px rgba(0,0,0,0.4);
   z-index: 3000;
 }
+
+/* Filtro por tipo de acción en tabla de eventos */
+.events-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.events-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #090e18;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+}
+
+.filter-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.filter-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.filter-btn.active {
+  background: #1e293b;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.filter-btn .dot-ind {
+  font-size: 10px;
+}

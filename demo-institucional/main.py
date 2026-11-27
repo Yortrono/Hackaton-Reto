@@ -28,33 +28,12 @@ IA_INFERENCE_URL = os.getenv("IA_INFERENCE_URL", "http://ia-conductual:8001/inte
 SDK_FILE_PATH = os.path.join(os.path.dirname(__file__), "static", "sdk", "sdk-verificacion.min.js")
 
 
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend-nucleo:8000")
+
+
 class LoginPayload(BaseModel):
     cedula: str
     password: str
-
-
-def generar_jwt_mock(challenge_id: str, risk_score: float, is_human: bool) -> str:
-    """Genera un JWT soberano compatible con la validación de borde OpenResty."""
-    header = {"typ": "JWT", "alg": "HS256"}
-    payload = {
-        "sub": challenge_id,
-        "iss": "servicio-verificacion-soberana",
-        "aud": "portal-ciudadano",
-        "risk_score": round(risk_score, 4),
-        "is_human": is_human,
-        "iat": int(time.time()),
-        "exp": int(time.time()) + 300,  # 5 minutos de validez
-    }
-    
-    header_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip("=")
-    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
-    signing_input = f"{header_b64}.{payload_b64}".encode()
-    
-    secret = b"clave-secreta-soberana-venezuela-2026"
-    sig = hmac.new(secret, signing_input, hashlib.sha256).digest()
-    sig_b64 = base64.urlsafe_b64encode(sig).decode().rstrip("=")
-    
-    return f"{header_b64}.{payload_b64}.{sig_b64}"
 
 
 HTML_PORTAL = """<!DOCTYPE html>
@@ -347,11 +326,22 @@ HTML_PORTAL = """<!DOCTYPE html>
             e.preventDefault();
             resDiv.style.display = 'none';
 
-            const token = activeToken || getCookie('vh_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) {
-                headers['X-Human-Token'] = token;
+            if (window.vhInstance && window.vhInstance.isBlocked) {
+                resDiv.style.display = 'block';
+                resDiv.className = 'alert-error';
+                resDiv.innerHTML = '<strong>✕ Acceso Denegado:</strong> El sistema de seguridad ha bloqueado la sesión por comportamiento automatizado.';
+                return;
             }
+
+            const token = activeToken || getCookie('vh_token');
+            if (!token) {
+                resDiv.style.display = 'block';
+                resDiv.className = 'alert-error';
+                resDiv.innerHTML = '<strong>✕ Verificación Requerida:</strong> Verificación humana en proceso. Por favor espere un instante o complete el reto.';
+                return;
+            }
+
+            const headers = { 'Content-Type': 'application/json', 'X-Human-Token': token };
 
             const payload = {
                 cedula: document.getElementById('cedula').value,
@@ -384,11 +374,23 @@ HTML_PORTAL = """<!DOCTYPE html>
 
         btnConsulta.addEventListener('click', async () => {
             resDiv.style.display = 'none';
-            const token = activeToken || getCookie('vh_token');
-            const headers = {};
-            if (token) {
-                headers['X-Human-Token'] = token;
+
+            if (window.vhInstance && window.vhInstance.isBlocked) {
+                resDiv.style.display = 'block';
+                resDiv.className = 'alert-error';
+                resDiv.innerHTML = '<strong>✕ Acceso Denegado:</strong> El sistema de seguridad ha bloqueado la sesión.';
+                return;
             }
+
+            const token = activeToken || getCookie('vh_token');
+            if (!token) {
+                resDiv.style.display = 'block';
+                resDiv.className = 'alert-error';
+                resDiv.innerHTML = '<strong>✕ Verificación Requerida:</strong> No se ha completado la verificación humana.';
+                return;
+            }
+
+            const headers = { 'X-Human-Token': token };
 
             try {
                 const response = await fetch('/api/consulta', { headers: headers });
@@ -432,97 +434,37 @@ async def servir_sdk():
 # =====================================================================
 
 @app.post("/api/v1/challenge/init")
-async def challenge_init(request: Request) -> Dict[str, Any]:
-    """Inicializa el desafío criptográfico y de telemetría para el SDK cliente."""
-    challenge_id = str(uuid.uuid4())
-    salt = os.urandom(8).hex()
-    
-    return {
-        "challenge_id": challenge_id,
-        "site_key": "vh_site_9f8e7d6c5b4a3210",
-        "action": "passive",
-        "pow": {
-            "algorithm": "SHA-256",
-            "salt": salt,
-            "nonce": salt,  # Garantiza compatibilidad con ambos contratos
-            "difficulty": 2,
-            "pow_difficulty": 2,
-            "expires_in_seconds": 60
-        },
-        "nonce": salt,
-        "pow_difficulty": 2,
-        "telemetry_required": True,
-        "interactive_required": False
-    }
+async def challenge_init(request: Request) -> JSONResponse:
+    """Reenvía la inicialización del desafío al Backend Núcleo oficial."""
+    try:
+        body = await request.body()
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.post(
+                f"{BACKEND_URL}/api/v1/challenge/init",
+                content=body,
+                headers={"Content-Type": "application/json"}
+            )
+            return JSONResponse(status_code=resp.status_code, content=resp.json())
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"error": f"Fallo al contactar Backend Núcleo: {str(e)}"})
 
 
 @app.post("/api/v1/challenge/verify")
 async def challenge_verify(request: Request) -> JSONResponse:
     """
-    Recibe la solución PoW y telemetría del SDK cliente.
-    Invoca el microservicio de inferencia IA en RAM (< 50ms) y emite JWT firmado.
+    Reenvía la verificación de telemetría y PoW al Backend Núcleo oficial (Ed25519 + IA en RAM).
     """
     try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    challenge_id = data.get("challenge_id", str(uuid.uuid4()))
-    telemetry = data.get("telemetry", {})
-    
-    # Preparar payload conforme al contrato JSON del motor IA
-    ia_payload = {
-        "challenge_id": challenge_id,
-        "telemetry_window_ms": telemetry.get("telemetry_window_ms", 2000),
-        "pointer_metrics": telemetry.get("pointer_metrics", {
-            "event_count": 35,
-            "mean_velocity": 1.25,
-            "std_acceleration": 0.38,
-            "angular_entropy": 2.75,
-            "straight_line_ratio": 0.15
-        }),
-        "keyboard_metrics": telemetry.get("keyboard_metrics", {
-            "key_count": 8,
-            "mean_dwell_ms": 90.0,
-            "std_flight_ms": 35.0
-        }),
-        "environment_signals": telemetry.get("environment_signals", {
-            "webdriver_flag": False,
-            "plugins_count": 5,
-            "languages_consistent": True,
-            "viewport_ratio_valid": True,
-            "time_to_first_interaction_ms": 550
-        })
-    }
-
-    risk_score = 0.12
-    is_human = True
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.post(IA_INFERENCE_URL, json=ia_payload)
-            if resp.status_code == 200:
-                result = resp.json()
-                risk_score = result.get("risk_score", 0.12)
-                is_human = (result.get("decision") == "human" or result.get("is_human", True))
-    except Exception:
-        risk_score = 0.15
-        is_human = True
-
-    # Generar token JWT para la sesión
-    jwt_token = generar_jwt_mock(challenge_id, risk_score, is_human)
-    status_str = "verified" if is_human and risk_score < 0.35 else ("challenge_required" if risk_score < 0.75 else "blocked")
-
-    return JSONResponse(
-        status_code=200,
-        content={
-            "challenge_id": challenge_id,
-            "status": status_str,
-            "risk_score": risk_score,
-            "is_human": is_human,
-            "jwt_token": jwt_token,
-            "expires_in_seconds": 300
-        }
-    )
+        body = await request.body()
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.post(
+                f"{BACKEND_URL}/api/v1/challenge/verify",
+                content=body,
+                headers={"Content-Type": "application/json"}
+            )
+            return JSONResponse(status_code=resp.status_code, content=resp.json())
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"error": f"Fallo al verificar con Backend Núcleo: {str(e)}"})
 
 
 @app.post("/login")

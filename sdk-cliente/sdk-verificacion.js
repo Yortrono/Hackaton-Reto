@@ -153,20 +153,18 @@
 
     var meanVelocity = velocities.length > 0
       ? (velocities.reduce(function (a, b) { return a + b; }, 0) / velocities.length)
-      : 0.85;
+      : 0.0;
 
     var meanAcc = accelerations.length > 0
       ? (accelerations.reduce(function (a, b) { return a + b; }, 0) / accelerations.length)
-      : 0.15;
+      : 0.0;
 
-    var stdAcceleration = 0;
+    var stdAcceleration = 0.0;
     if (accelerations.length > 1) {
       var sumSquares = accelerations.reduce(function (acc, val) {
         return acc + Math.pow(val - meanAcc, 2);
       }, 0);
       stdAcceleration = Math.sqrt(sumSquares / accelerations.length);
-    } else {
-      stdAcceleration = 0.25;
     }
 
     // Entropía angular (histograma de 8 cuadrantes de dirección)
@@ -178,7 +176,7 @@
       octants[oct]++;
     }
 
-    var angularEntropy = 0;
+    var angularEntropy = 0.0;
     if (angles.length > 0) {
       for (var o = 0; o < 8; o++) {
         var p = octants[o] / angles.length;
@@ -186,41 +184,37 @@
           angularEntropy -= p * (Math.log(p) / Math.LN2);
         }
       }
-    } else {
-      angularEntropy = 2.45; // entropía humana base
     }
 
     // Straight line ratio (distancia neta / distancia total recorrida)
-    var straightLineRatio = 0.15;
+    var straightLineRatio = 0.0;
     if (pCount > 1 && totalPath > 0) {
       var firstP = this.pointerEvents[0];
       var lastP = this.pointerEvents[pCount - 1];
       var netDx = lastP.x - firstP.x;
       var netDy = lastP.y - firstP.y;
       var netDist = Math.sqrt(netDx * netDx + netDy * netDy);
-      straightLineRatio = Math.min(1.0, Math.max(0.01, netDist / totalPath));
+      straightLineRatio = Math.min(1.0, netDist / totalPath);
     }
 
     // 2. Métricas de teclado
     var meanDwell = this.dwellTimes.length > 0
       ? (this.dwellTimes.reduce(function (a, b) { return a + b; }, 0) / this.dwellTimes.length)
-      : 82.0;
+      : 0.0;
 
-    var stdFlight = 0;
+    var stdFlight = 0.0;
     if (this.flightTimes.length > 1) {
       var meanFlight = this.flightTimes.reduce(function (a, b) { return a + b; }, 0) / this.flightTimes.length;
       var sqFlight = this.flightTimes.reduce(function (acc, val) {
         return acc + Math.pow(val - meanFlight, 2);
       }, 0);
       stdFlight = Math.sqrt(sqFlight / this.flightTimes.length);
-    } else {
-      stdFlight = 28.5;
     }
 
     // 3. Señales de entorno del navegador
     var hasNavigator = typeof navigator !== 'undefined';
     var webdriverFlag = hasNavigator ? Boolean(navigator.webdriver) : false;
-    var pluginsCount = (hasNavigator && navigator.plugins) ? navigator.plugins.length : 4;
+    var pluginsCount = (hasNavigator && navigator.plugins) ? navigator.plugins.length : 0;
     var languagesConsistent = hasNavigator
       ? Boolean(navigator.language && Array.isArray(navigator.languages) && navigator.languages.indexOf(navigator.language) !== -1)
       : true;
@@ -233,14 +227,14 @@
       challenge_id: challengeId,
       telemetry_window_ms: windowMs,
       pointer_metrics: {
-        event_count: Math.max(pCount, 12),
+        event_count: pCount,
         mean_velocity: parseFloat(meanVelocity.toFixed(2)),
         std_acceleration: parseFloat(stdAcceleration.toFixed(2)),
         angular_entropy: parseFloat(angularEntropy.toFixed(2)),
         straight_line_ratio: parseFloat(straightLineRatio.toFixed(2))
       },
       keyboard_metrics: {
-        key_count: Math.max(this.keyCount, 4),
+        key_count: this.keyCount,
         mean_dwell_ms: parseFloat(meanDwell.toFixed(1)),
         std_flight_ms: parseFloat(stdFlight.toFixed(1))
       },
@@ -249,7 +243,7 @@
         plugins_count: pluginsCount,
         languages_consistent: languagesConsistent,
         viewport_ratio_valid: viewportValid,
-        time_to_first_interaction_ms: this.timeToFirstInteraction || Math.min(windowMs, 520)
+        time_to_first_interaction_ms: this.timeToFirstInteraction || 0
       }
     };
   };
@@ -279,9 +273,8 @@
           return hexCounter;
         }
 
-        if (counter > 100000) {
-          // Salida de seguridad
-          return '000a8f9c21';
+        if (counter > 200000) {
+          throw new Error('POW_COMPUTATION_LIMIT_EXCEEDED');
         }
 
         return tryIteration(counter + 1);
@@ -291,8 +284,7 @@
     if (typeof crypto !== 'undefined' && crypto.subtle) {
       return tryIteration(0);
     } else {
-      // Fallback sincrónico sin Web Crypto
-      return Promise.resolve('000a8f9c21');
+      return Promise.reject(new Error('WEB_CRYPTO_UNAVAILABLE'));
     }
   }
 
@@ -358,27 +350,70 @@
         if (data.interactive_challenge && data.interactive_challenge.required_immediately) {
           self.renderizarDesafio(data.interactive_challenge);
         } else {
-          // Espera la ventana pasiva para recolectar señales naturales
-          setTimeout(function () {
-            self.ejecutarVerificacionPasiva();
-          }, self.config.passiveDelayMs);
+          // Espera interacción natural o ventana pasiva adaptativa
+          self.programarVerificacionPasiva();
         }
       })
       .catch(function (err) {
-        console.warn('[VerificacionHumana] init falló, usando contingencia local:', err.message);
-        // Modo simulado / resiliente para desarrollo desacoplado
-        self.initResponse = {
-          challenge_id: self.uuidv4(),
-          policy_mode: 'challenge',
-          pow_difficulty: 3,
-          nonce: '8f14e45fceea167a5a36dedd4bea2543',
-          expires_in_seconds: 120
-        };
-        self.activeChallenge = self.initResponse;
-        setTimeout(function () {
-          self.ejecutarVerificacionPasiva();
-        }, self.config.passiveDelayMs);
+        console.error('[VerificacionHumana] Error al conectar con el servicio soberano de desafío:', err.message);
+        var container = document.getElementById(self.config.containerId);
+        if (container) {
+          container.innerHTML = '<div style="color: #ef4444; font-size: 13px; padding: 10px;">✕ Error de conexión con el servicio de verificación soberana.</div>';
+        }
+        if (typeof self.config.onError === 'function') {
+          self.config.onError({ error: 'CHALLENGE_INIT_FAILED', message: err.message });
+        }
       });
+  };
+
+  /**
+   * Programa la verificación pasiva escuchando interacciones naturales (puntero/teclas)
+   */
+  VerificacionHumanaSDK.prototype.programarVerificacionPasiva = function () {
+    var self = this;
+    var executed = false;
+    var debounceTimer = null;
+    var fallbackTimer = null;
+
+    function ejecutar() {
+      if (executed) return;
+      executed = true;
+      limpiar();
+      self.ejecutarVerificacionPasiva();
+    }
+
+    function onInteraction() {
+      if (executed) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      // Recolectar ~350ms de trayectoria continua antes de evaluar
+      debounceTimer = setTimeout(function () {
+        if (self.telemetry.pointerEvents.length >= 6 || self.telemetry.keyCount > 0) {
+          ejecutar();
+        }
+      }, 350);
+    }
+
+    function limpiar() {
+      if (typeof window === 'undefined') return;
+      window.removeEventListener('pointermove', onInteraction);
+      window.removeEventListener('mousemove', onInteraction);
+      window.removeEventListener('keydown', onInteraction);
+      window.removeEventListener('focusin', onInteraction);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pointermove', onInteraction, { passive: true });
+      window.addEventListener('mousemove', onInteraction, { passive: true });
+      window.addEventListener('keydown', onInteraction, { passive: true });
+      window.addEventListener('focusin', onInteraction, { passive: true });
+    }
+
+    // Si el usuario no interactúa en 3.5 segundos, evaluar automáticamente
+    fallbackTimer = setTimeout(function () {
+      ejecutar();
+    }, 3500);
   };
 
   /**
@@ -416,16 +451,14 @@
           self.procesarResultadoVerificacion(result.data, verifyPayload);
         })
         .catch(function (err) {
-          console.warn('[VerificacionHumana] verify local fallback:', err.message);
-          // Simulación determinista local si el backend no está disponible en testing
-          var mockResponse = {
-            challenge_id: challengeId,
-            status: 'verified',
-            risk_score: 0.12,
-            jwt_token: self.generarTokenMock(challengeId),
-            expires_in_seconds: 90
-          };
-          self.procesarResultadoVerificacion(mockResponse, verifyPayload);
+          console.error('[VerificacionHumana] Error al verificar telemetría en el backend:', err.message);
+          var container = document.getElementById(self.config.containerId);
+          if (container) {
+            container.innerHTML = '<div style="color: #ef4444; font-size: 13px; padding: 10px;">✕ Error al verificar señales conductuales en el servidor.</div>';
+          }
+          if (typeof self.config.onError === 'function') {
+            self.config.onError({ error: 'VERIFICATION_FAILED', message: err.message });
+          }
         });
     });
   };
@@ -712,61 +745,66 @@
       var precisionDelta = parseFloat((delta / 360).toFixed(4));
 
       var challengeId = (self.activeChallenge && self.activeChallenge.challenge_id) || self.uuidv4();
-      var verifyUrl = (self.config.apiBase || '') + '/api/v1/challenge/verify';
+      var nonce = (self.activeChallenge && self.activeChallenge.nonce) ? self.activeChallenge.nonce : '8f14e45fceea';
+      var diff = (self.activeChallenge && self.activeChallenge.pow_difficulty) ? self.activeChallenge.pow_difficulty : 3;
 
-      var interactivePayload = {
-        site_key: self.config.siteKey || 'vh_site_9f8e7d6c5b4a3210',
-        challenge_id: challengeId,
-        pow_solution: '000a8f9c21',
-        telemetry: self.telemetry.computeMetrics(challengeId),
-        interactive_response: {
-          completed: true,
-          interaction_duration_ms: duration,
-          precision_delta: precisionDelta
-        }
-      };
+      solvePoW(nonce, diff).then(function (solution) {
+        var verifyUrl = (self.config.apiBase || '') + '/api/v1/challenge/verify';
+        var interactivePayload = {
+          site_key: self.config.siteKey || 'vh_site_9f8e7d6c5b4a3210',
+          challenge_id: challengeId,
+          pow_solution: solution,
+          telemetry: self.telemetry.computeMetrics(challengeId),
+          interactive_response: {
+            completed: true,
+            interaction_duration_ms: duration,
+            precision_delta: precisionDelta
+          }
+        };
 
-      fetch(verifyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(interactivePayload)
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          if (data.status === 'verified') {
-            self.inyectarToken(data.jwt_token);
-            container.innerHTML = [
-              '<div style="color: #16a34a; padding: 12px; font-weight: 600;">',
-              '  ✓ Verificación humana completada con éxito',
-              '</div>'
-            ].join('\n');
-            setTimeout(function () {
-              self.limpiarWidget();
-            }, 1200);
-            if (typeof self.config.onVerified === 'function') {
-              self.config.onVerified(data);
+        fetch(verifyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(interactivePayload)
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.status === 'verified' && data.jwt_token) {
+              self.inyectarToken(data.jwt_token);
+              container.innerHTML = [
+                '<div style="color: #16a34a; padding: 12px; font-weight: 600;">',
+                '  ✓ Verificación humana completada con éxito',
+                '</div>'
+              ].join('\n');
+              setTimeout(function () {
+                self.limpiarWidget();
+              }, 1200);
+              if (typeof self.config.onVerified === 'function') {
+                self.config.onVerified(data);
+              }
+            } else {
+              statusMsg.className = 'vh-status pending';
+              statusMsg.textContent = 'Intento no válido o precisión insuficiente. Vuelva a intentar.';
+              submitBtn.textContent = 'Reintentar';
+              submitBtn.disabled = false;
             }
-          } else {
-            statusMsg.className = 'vh-status pending';
-            statusMsg.textContent = 'Intento no válido. Vuelva a intentar.';
+          })
+          .catch(function (err) {
+            statusMsg.className = 'vh-status error';
+            statusMsg.textContent = 'Error al contactar con el backend soberano: ' + (err.message || 'Fallo de red');
             submitBtn.textContent = 'Reintentar';
             submitBtn.disabled = false;
-          }
-        })
-        .catch(function () {
-          // Fallback resiliente
-          var mockToken = self.generarTokenMock(challengeId);
-          self.inyectarToken(mockToken);
-          container.innerHTML = '<div style="color: #16a34a; padding: 12px; font-weight: 600;">✓ Verificación completada</div>';
-          setTimeout(function () { self.limpiarWidget(); }, 1000);
-          if (typeof self.config.onVerified === 'function') {
-            self.config.onVerified({ status: 'verified', jwt_token: mockToken });
-          }
-        });
+          });
+      });
     });
   };
 
   VerificacionHumanaSDK.prototype.renderizarBloqueo = function (data) {
+    this.isBlocked = true;
+    this.verifiedToken = null;
+    if (typeof document !== 'undefined') {
+      document.cookie = 'vh_token=; Max-Age=0; path=/; SameSite=Lax';
+    }
     var container = document.getElementById(this.config.containerId);
     if (!container) return;
     container.innerHTML = [
@@ -785,10 +823,19 @@
   };
 
   VerificacionHumanaSDK.prototype.uuidv4 = function () {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      var r = (Math.random() * 16) | 0;
-      var v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      var buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      buf[6] = (buf[6] & 0x0f) | 0x40;
+      buf[8] = (buf[8] & 0x3f) | 0x80;
+      var hex = Array.from(buf, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+      return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+    }
+    return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function (c) {
+      return (c ^ (Date.now() & 15) >> (c / 4)).toString(16);
     });
   };
 
@@ -799,21 +846,6 @@
       hash |= 0;
     }
     return Math.abs(hash).toString(16);
-  };
-
-  VerificacionHumanaSDK.prototype.generarTokenMock = function (cid) {
-    var header = btoa(JSON.stringify({ alg: 'EdDSA', typ: 'JWT', kid: 'key-2026-01' }));
-    var payload = btoa(JSON.stringify({
-      iss: 'servicio-verificacion-humana.gob.ve',
-      sub: 'anon_session_' + cid.substring(0, 8),
-      aud: this.config.siteKey || 'vh_site_9f8e7d6c5b4a3210',
-      jti: this.uuidv4(),
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 120,
-      risk_score: 0.12,
-      verification_mode: 'passive'
-    }));
-    return header + '.' + payload + '.mock_signature_eddsa_soberana';
   };
 
   // Exposición en namespace global y soporte CommonJS / ESM
